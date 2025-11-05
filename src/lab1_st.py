@@ -541,7 +541,7 @@ def build_kolmogorov_equations_latex(nodes):
     eqs_latex = []
     for node in nodes:
         # Позначення для ймовірності перебування у стані node.idx
-        P = f"P_{{{node.idx}}}(t)"
+        P = f"P_{{{node.num}}}(t)"
         dPdt = f"\\frac{{d{P}}}{{dt}}"
         # Вхідні переходи (з яких можна потрапити у node)
         in_terms = []
@@ -553,7 +553,7 @@ def build_kolmogorov_equations_latex(nodes):
                         for bid in node.block_states if node.block_states[bid] != inp_node.block_states[bid]]
                 for bid, st1, st2 in diff:
                     lam = node.block_lams.get(bid, None)
-                    in_terms.append(f"{lam} {P.replace(str(node.idx), str(inp_num))}")
+                    in_terms.append(f"{lam} P_{{{inp_node.num}}}(t)")
         # Вихідні переходи (з яких можна піти з node)
         out_terms = []
         for out_num in node.outputs:
