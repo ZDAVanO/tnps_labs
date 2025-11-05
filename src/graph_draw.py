@@ -23,7 +23,7 @@ mono_font_large = ImageFont.truetype("CascadiaMono.ttf", 90)
 arrow_colors = [
     (255, 0, 0, 128),      # red
     (0, 255, 0, 128),      # green
-    (255, 255, 255, 128),  # white (замість blue)
+    (255, 255, 255, 128),  # white
     (255, 255, 0, 128),    # yellow
     (255, 0, 255, 128),    # magenta
     (0, 255, 255, 128),    # cyan

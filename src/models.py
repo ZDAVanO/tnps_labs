@@ -9,7 +9,7 @@ class LogicBlock:
         self.state = state
         self.inputs = []
         self.outputs = []
-        self.lam = lam  # інтенсивність відмов (λ)
+        self.lam = lam  # failure rate (λ)
 
     def connect_to(self, other_block):
         self.outputs.append(other_block.id)
@@ -72,12 +72,12 @@ class GraphNode:
         
         self.row = row
         self.idx = idx
-        self.num = num  # порядковий номер валідної ноди
+        self.num = num  # sequential number of valid node
         self.node_parent = node_parent
-        # Якщо block_states не передано — всі блоки справні
+        # If block_states is not provided — all blocks are working
         self.block_ids = block_ids if block_ids is not None else []
         self.block_states = block_states if block_states is not None else {bid: 1 for bid in self.block_ids}
-        # Зберігаємо типи блоків для зручності
+        # Store block types for convenience
         self.block_types = block_types if block_types is not None else {}
         self.block_lams = block_lams if block_lams is not None else {}
 
@@ -104,7 +104,7 @@ class GraphNode:
             block_type = self.block_types.get(bid, None)
             is_integer = isinstance(bid, int) or (isinstance(bid, float) and bid.is_integer())
             state = self.block_states[bid]
-            # Формуємо рядок
+            # Form the line
             if block_type and not is_integer:
                 lines.append(f"{int(bid) if bid == int(bid) else int(bid)}.{block_type} - {state} {'x' if bid in self.locked_blocks else ''}")
             else:
