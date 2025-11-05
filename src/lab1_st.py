@@ -15,6 +15,9 @@ from scipy.integrate import solve_ivp
 Image.MAX_IMAGE_PIXELS = None  # Вимикає перевірку на "decompression bomb"
 
 from graph_draw import draw_node, draw_graph, draw_nodes
+from models import LogicBlock, can_reach, GraphNode
+
+from typing import List
 
 
 # MARK: st config
@@ -108,27 +111,6 @@ with st.sidebar:
 start_time = time.time()
 
 
-# MARK: LogicBlock
-class LogicBlock:
-    def __init__(self, block_id, type, state=1, lam=0.0):
-        self.id = block_id
-        self.type = type
-        self.state = state
-        self.inputs = []
-        self.outputs = []
-        self.lam = lam  # інтенсивність відмов (λ)
-
-    def connect_to(self, other_block):
-        self.outputs.append(other_block.id)
-        other_block.inputs.append(self.id)
-
-    def set_state(self, new_state):
-        self.state = new_state
-
-    def is_working(self):
-        return self.state == 1
-
-
 
 
 # MARK: Blocks
@@ -195,123 +177,6 @@ blocks[5.2].connect_to(blocks[6])
 
 # blocks[2].connect_to(blocks[4])
 # blocks[3].connect_to(blocks[4])
-
-
-
-
-
-
-
-
-
-
-
-
-
-# MARK: can_reach()
-def can_reach(start_id, end_id, broken_ids):
-    # Set block states
-    for b in blocks.values():
-        b.set_state(0 if b.id in broken_ids else 1)
-
-    visited = set()
-    stack = [start_id]
-
-    step = 0
-    while stack:
-        current = stack.pop()
-        # print(f"Step {step}: Current block {current}, state: {'working' if blocks[current].is_working() else 'broken'}, stack: {stack}")
-        step += 1
-        if current == end_id:
-            # print(f"Reached end block {end_id}")
-            return True
-        visited.add(current)
-
-        # If block is working — go further
-        if blocks[current].is_working():
-            # print(f"Block {current} is working, checking outputs: {blocks[current].outputs}")
-            for nxt in blocks[current].outputs:
-                if nxt not in visited:
-                    # print(f"Adding block {nxt} to stack")
-                    stack.append(nxt)
-                else:
-                    # print(f"Block {nxt} already visited")
-                    pass
-
-    # print(f"Cannot reach end block {end_id}")
-    return False
-
-
-# print("Input and output connections for each block:")
-# for block in blocks.values():
-#     print(f"Block {block.id} ({block.type}): inputs={block.inputs}, outputs={block.outputs}")
-
-# print()
-# print("-" * 40)
-# print()
-
-# # --- Examples ---
-# broken_sets = [
-#     {1.1, 2, 5.1},      # 1 and 5 are broken
-#     {1.2, 2, 5.1},   # 3, 4 and 5 are broken
-
-# ]
-
-# for broken in broken_sets:
-#     result = can_reach(0, 6, broken)
-#     print(f"Breakdowns {broken}: {'Can reach' if result else 'Cannot reach'}")
-    
-#     print()
-#     print("-" * 40)
-#     print()
-
-
-
-
-
-## MARK: GraphNode
-class GraphNode:
-    def __init__(self, row, idx, num, node_parent, block_states=None, block_ids=None, block_types=None, block_lams=None):
-        self.row = row
-        self.idx = idx
-        self.num = num  # порядковий номер валідної ноди
-        self.node_parent = node_parent
-        # Якщо block_states не передано — всі блоки справні
-        self.block_ids = block_ids if block_ids is not None else []
-        self.block_states = block_states if block_states is not None else {bid: 1 for bid in self.block_ids}
-        # Зберігаємо типи блоків для зручності
-        self.block_types = block_types if block_types is not None else {}
-        self.block_lams = block_lams if block_lams is not None else {}
-
-        self.inputs = []
-        self.outputs = []
-
-        self.duplicate_of = []
-
-        self.locked_blocks = []
-
-        self.is_dead = False
-
-    def mark_duplicate_of(self, other_node):
-        self.duplicate_of.append(other_node.idx)
-
-    def connect_to(self, other_block):
-        self.outputs.append(other_block.idx)
-        other_block.inputs.append(self.idx)
-
-    def print_states_lines(self):
-        lines = []
-        lines.append(f"Node (idx={self.idx}, num={self.num}, row={self.row}, parent={self.node_parent}):")
-        for bid in sorted(self.block_states):
-            block_type = self.block_types.get(bid, None)
-            is_integer = isinstance(bid, int) or (isinstance(bid, float) and bid.is_integer())
-            state = self.block_states[bid]
-            # Формуємо рядок
-            if block_type and not is_integer:
-                lines.append(f"{int(bid) if bid == int(bid) else int(bid)}.{block_type} - {state} {'x' if bid in self.locked_blocks else ''}")
-            else:
-                lines.append(f"{int(bid)}   - {state} ")
-        return lines
 
 
 
@@ -402,7 +267,7 @@ def generate_graph():
 
 
             broken_ids = [bid for bid, state in new_states.items() if state == 0]
-            can_reach_result = can_reach(0, max(blocks.keys()), broken_ids)
+            can_reach_result = can_reach(blocks, 0, max(blocks.keys()), broken_ids)
             if not can_reach_result:
                 node.is_dead = True
 
@@ -479,9 +344,9 @@ with st.expander("Graph Generation Output", expanded=False):
 
 
 # MARK: print_valid_nodes_connections
-def get_valid_nodes_connections_text(valid_nodes):
+def get_valid_nodes_connections_text(nodes: List[GraphNode]):
     lines = []
-    for node in valid_nodes:
+    for node in nodes:
         lines.append(f"Node #{node.idx} num={node.num} (row={node.row}, parent={node.node_parent}):")
         lines.append("  Block states:")
         for bid in sorted(node.block_states):
@@ -494,7 +359,7 @@ def get_valid_nodes_connections_text(valid_nodes):
                 lines.append(f"    {int(bid)}   - {state} {lock}")
         lines.append(f"  Inputs: {node.inputs}")
         for inp_num in node.inputs:
-            inp_node = next((n for n in valid_nodes if n.idx == inp_num), None)
+            inp_node = next((n for n in nodes if n.idx == inp_num), None)
             if inp_node:
                 diff = [(bid, node.block_states[bid], inp_node.block_states[bid]) 
                         for bid in node.block_states if node.block_states[bid] != inp_node.block_states[bid]]
@@ -503,7 +368,7 @@ def get_valid_nodes_connections_text(valid_nodes):
                     lines.append(f"    Input from node {inp_num}: Block {bid} λ={lam} (state: {st2}→{st1})")
         lines.append(f"  Outputs: {node.outputs}")
         for out_num in node.outputs:
-            out_node = next((n for n in valid_nodes if n.idx == out_num), None)
+            out_node = next((n for n in nodes if n.idx == out_num), None)
             if out_node:
                 diff = [(bid, node.block_states[bid], out_node.block_states[bid]) 
                         for bid in node.block_states if node.block_states[bid] != out_node.block_states[bid]]
@@ -525,7 +390,7 @@ with st.expander("Valid Nodes and Connections", expanded=False):
 
 
 # MARK: build_kolmogorov_equations_latex
-def build_kolmogorov_equations_latex(nodes):
+def build_kolmogorov_equations_latex(nodes: List[GraphNode]):
     eqs_latex = []
     for node in nodes:
         # Позначення для ймовірності перебування у стані node.idx
@@ -581,24 +446,24 @@ with st.expander("Equations", expanded=False):
 
 
 # MARK: kolmogorov_rhs
-def kolmogorov_rhs(t, P, valid_nodes):
+def kolmogorov_rhs(t, P, nodes: List[GraphNode]):
 
     dPdt = np.zeros_like(P) # dPdt — масив похідних ймовірностей для кожного стану (ноди)
 
-    for i, node in enumerate(valid_nodes):
+    for i, node in enumerate(nodes):
 
         in_terms = []
         out_terms = []
 
         # Перебираємо всі вхідні ноди (звідки можна потрапити у поточну)
         for inp_num in node.inputs:
-            # Знаходимо індекс вхідної ноди у списку valid_nodes
-            inp_idx = next((j for j, n in enumerate(valid_nodes) if n.idx == inp_num), None)
+            # Знаходимо індекс вхідної ноди у списку nodes
+            inp_idx = next((j for j, n in enumerate(nodes) if n.idx == inp_num), None)
             if inp_idx is not None:
                 # Визначаємо, які блоки змінили стан при переході з inp_node у node
-                diff = [(bid, node.block_states[bid], valid_nodes[inp_idx].block_states[bid]) 
+                diff = [(bid, node.block_states[bid], nodes[inp_idx].block_states[bid]) 
                         for bid in node.block_states 
-                        if node.block_states[bid] != valid_nodes[inp_idx].block_states[bid]]
+                        if node.block_states[bid] != nodes[inp_idx].block_states[bid]]
                 # print(diff)
                 
                 # Для кожного такого блоку додаємо доданок у in_terms
@@ -612,13 +477,13 @@ def kolmogorov_rhs(t, P, valid_nodes):
 
         # Перебираємо всі вихідні ноди (куди можна перейти з поточної)
         for out_num in node.outputs:
-            # Знаходимо індекс вихідної ноди у списку valid_nodes
-            out_idx = next((j for j, n in enumerate(valid_nodes) if n.idx == out_num), None)
+            # Знаходимо індекс вихідної ноди у списку nodes
+            out_idx = next((j for j, n in enumerate(nodes) if n.idx == out_num), None)
             if out_idx is not None:
                 # Визначаємо, які блоки змінили стан при переході з node у out_node
-                diff = [(bid, node.block_states[bid], valid_nodes[out_idx].block_states[bid]) 
+                diff = [(bid, node.block_states[bid], nodes[out_idx].block_states[bid]) 
                         for bid in node.block_states 
-                        if node.block_states[bid] != valid_nodes[out_idx].block_states[bid]]
+                        if node.block_states[bid] != nodes[out_idx].block_states[bid]]
                 
                 # Для кожного такого блоку додаємо доданок у out_terms
                 for bid, st1, st2 in diff:
@@ -634,8 +499,8 @@ def kolmogorov_rhs(t, P, valid_nodes):
     return dPdt
 
 # MARK: solve_kolmogorov
-def solve_kolmogorov(valid_nodes, t_span, P0=None, t_eval=None):
-    n = len(valid_nodes)
+def solve_kolmogorov(nodes, t_span, P0=None, t_eval=None):
+    n = len(nodes)
     if P0 is None:
         P0 = np.zeros(n)
         P0[0] = 1.0  # Початковий стан: вся ймовірність у першій ноді
@@ -643,7 +508,7 @@ def solve_kolmogorov(valid_nodes, t_span, P0=None, t_eval=None):
         t_eval = np.linspace(t_span[0], t_span[1], 1500)
         # t_eval = np.linspace(t_span[0], t_span[1], t_span[1] + 1)
     sol = solve_ivp(
-        fun=lambda t, P: kolmogorov_rhs(t, P, valid_nodes),
+        fun=lambda t, P: kolmogorov_rhs(t, P, nodes),
         t_span=t_span,
         y0=P0,
         t_eval=t_eval,
