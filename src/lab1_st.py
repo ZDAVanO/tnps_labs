@@ -85,7 +85,7 @@ with st.sidebar:
     # st.header("Параметри інтегрування")
     integration_time = st.slider(
         "Час інтегрування (t, сек)", 
-        min_value=100, max_value=20000, value=2500, step=100
+        min_value=100, max_value=15000, value=2500, step=100
     )
 
     lam_min_value = 0.0
@@ -132,45 +132,6 @@ class LogicBlock:
 
 
 # MARK: Blocks
-# b_start = LogicBlock(0, "Start")
-
-# b1_h = LogicBlock(1.1, "H", lam=lam_b1_h) # 0.0005
-# b1_s = LogicBlock(1.2, "S", lam=lam_b1_s) # 0.0005
-
-# b2 = LogicBlock(2, "H", lam=lam_b2) # 0.0004
-# b3 = LogicBlock(3, "H", lam=lam_b3) # 0.0003
-# b4 = LogicBlock(4, "H", lam=lam_b4) # 0.00025
-
-# b5_h = LogicBlock(5.1, "H", lam=lam_b5_h) # 0.0005
-# b5_s = LogicBlock(5.2, "S", lam=lam_b5_s) # 0.0001
-
-# b_end = LogicBlock(6, "End")
-
-# blocks = {b.id: b for b in [b_start, b1_h, b1_s, b2, b3, b4, b5_h, b5_s, b_end]}
-
-# MARK: Connections
-# b_start.connect_to(b1_h)
-# b_start.connect_to(b2)
-# b_start.connect_to(b5_h)
-
-# b1_h.connect_to(b1_s)
-# b5_h.connect_to(b5_s)
-
-# b1_s.connect_to(b3)
-# b1_s.connect_to(b4)
-
-# b2.connect_to(b3)
-# b2.connect_to(b4)
-
-# b3.connect_to(b_end)
-# b4.connect_to(b_end)
-# b5_s.connect_to(b_end)
-
-
-
-
-
-
 blocks = {
     0:    LogicBlock(0, "Start"),
 
@@ -417,19 +378,6 @@ def generate_graph():
             continue
 
 
-        # Відфільтровуємо 1.2 якщо 1.1 вже поламаний, і 5.2 якщо 5.1 вже поламаний
-        # filtered_blocks = []
-        # for bid in working_blocks:
-        #     if bid == 1.2 and current_states.get(1.1, 1) == 0:
-        #         continue
-        #     if bid == 1.1 and current_states.get(1.2, 1) == 0:
-        #         continue
-        #     if bid == 5.2 and current_states.get(5.1, 1) == 0:
-        #         continue
-        #     if bid == 5.1 and current_states.get(5.2, 1) == 0:
-        #         continue
-        #     filtered_blocks.append(bid)
-
         filtered_blocks = []
         for bid in working_blocks:
             skip = False
@@ -447,17 +395,6 @@ def generate_graph():
             new_states = current_states.copy()
             new_states[broken_bid] = 0
 
-
-            # Визначаємо заблоковані блоки
-            # locked_blocks = []
-            # if (new_states.get(1.1, 1) == 0) and (new_states.get(1.2, 1) == 1):
-            #     locked_blocks.append(1.2)
-            # if (new_states.get(1.2, 1) == 0) and (new_states.get(1.1, 1) == 1):
-            #     locked_blocks.append(1.1)
-            # if (new_states.get(5.1, 1) == 0) and (new_states.get(5.2, 1) == 1):
-            #     locked_blocks.append(5.2)
-            # if (new_states.get(5.2, 1) == 0) and (new_states.get(5.1, 1) == 1):
-            #     locked_blocks.append(5.1)
 
             locked_blocks = []
             for a, b in mutual_exclusions:
@@ -596,72 +533,59 @@ with st.expander("Valid Nodes and Connections", expanded=False):
 
 
 
-# MARK: build_kolmogorov_equations
-def build_kolmogorov_equations(valid_nodes):
-    eqs = []
-    for node in valid_nodes:
+
+
+
+# MARK: build_kolmogorov_equations_latex
+def build_kolmogorov_equations_latex(nodes):
+    eqs_latex = []
+    for node in nodes:
         # Позначення для ймовірності перебування у стані node.idx
-        P = f"P{node.idx}(t)"
-        dPdt = f"d{P}/dt"
+        P = f"P_{{{node.idx}}}(t)"
+        dPdt = f"\\frac{{d{P}}}{{dt}}"
         # Вхідні переходи (з яких можна потрапити у node)
         in_terms = []
         for inp_num in node.inputs:
-            inp_node = next((n for n in valid_nodes if n.idx == inp_num), None)
+            inp_node = next((n for n in nodes if n.idx == inp_num), None)
             if inp_node:
                 # Знаходимо блок, який змінився
                 diff = [(bid, node.block_states[bid], inp_node.block_states[bid]) 
                         for bid in node.block_states if node.block_states[bid] != inp_node.block_states[bid]]
                 for bid, st1, st2 in diff:
                     lam = node.block_lams.get(bid, None)
-                    in_terms.append(f"{lam}*P{inp_num}(t)")
+                    in_terms.append(f"{lam} {P.replace(str(node.idx), str(inp_num))}")
         # Вихідні переходи (з яких можна піти з node)
         out_terms = []
         for out_num in node.outputs:
-            out_node = next((n for n in valid_nodes if n.idx == out_num), None)
+            out_node = next((n for n in nodes if n.idx == out_num), None)
             if out_node:
                 diff = [(bid, node.block_states[bid], out_node.block_states[bid]) 
                         for bid in node.block_states if node.block_states[bid] != out_node.block_states[bid]]
                 for bid, st1, st2 in diff:
                     lam = node.block_lams.get(bid, None)
-                    out_terms.append(f"{lam}*{P}")
+                    out_terms.append(f"{lam} {P}")
         # Формуємо рівняння
         rhs = ""
         if in_terms:
             rhs += " + ".join(in_terms)
         if out_terms:
-            # if rhs: rhs += " - "
-            # rhs += " - ".join(out_terms)
             if rhs:
                 rhs += " - "
                 rhs += " - ".join(out_terms)
             else:
-                # Якщо немає входів, всі виходи мають бути зі знаком мінус
                 rhs += "- "
                 rhs += " - ".join([f"{term}" for term in out_terms])
         if not rhs:
             rhs = "0"
-        eqs.append(f"{dPdt} = {rhs}")
+        eqs_latex.append(f"{dPdt} = {rhs}")
 
-    return eqs
-    
+    return eqs_latex
 
-eqs = build_kolmogorov_equations(valid_nodes)
-# Вивід у консоль
-    # print("\nСистема диференційних рівнянь Колмогорова–Чепмена:")
-for eq in eqs:
-    print(eq)
+eqs_latex = build_kolmogorov_equations_latex(valid_nodes)
 
-def eqs_to_latex(eqs):
-    latex_eqs = []
-    for eq in eqs:
-        eq_latex = eq.replace("dP", r"\frac{dP")
-        eq_latex = eq_latex.replace("/dt", r"}{dt}")
-        eq_latex = eq_latex.replace("*", r"")
-        latex_eqs.append(eq_latex)
-    return latex_eqs
 
 with st.expander("Equations", expanded=False):
-    for idx, eq_latex in enumerate(eqs_to_latex(eqs), 1):
+    for idx, eq_latex in enumerate(eqs_latex, 1):
         st.latex(f"{idx}.\\quad {eq_latex}", width="content")
 
 
@@ -949,13 +873,12 @@ time_stats['state_probs_chart'] = time.time() - state_probs_chart_start_time
 
 
 
-# MARK: draw and save images
-# with st.container(border=True):
-with st.expander(f"Draw Graph", 
-                 expanded=True):
+# MARK: draw graph
+with st.expander(f"Draw Graph", expanded=True):
     if st.button("Generate and Draw Graph"):
-        os.makedirs("images/", exist_ok=True)
         with st.spinner("Wait for it...", show_time=True):
+
+            os.makedirs("images/", exist_ok=True)
 
             # Засікання часу для малювання графа
             t0_graph = time.time()
@@ -977,26 +900,22 @@ with st.expander(f"Draw Graph",
 
             st.success("Images saved to disk.")
 
-# img_graph.show()
-# img_all.show()
+            # img_graph.show()
+            # img_all.show()
+
+            # # Зберегти у 2 рази менший розмір
+            # img_graph_2x = img_graph.resize((img_graph.width // 2, img_graph.height // 2), Image.LANCZOS)
+            # img_graph_2x.save("graph_2x.png")
+            # img_all_2x = img_all.resize((img_all.width // 2, img_all.height // 2), Image.LANCZOS)
+            # img_all_2x.save("all_nodes_2x.png")
 
 
 
-# print("Saving images...")
-# img_graph.save("graph.png")
-# img_all.save("all_nodes.png")
 
-# # Зберегти у 2 рази менший розмір
-# img_graph_2x = img_graph.resize((img_graph.width // 2, img_graph.height // 2), Image.LANCZOS)
-# img_graph_2x.save("graph_2x.png")
-# img_all_2x = img_all.resize((img_all.width // 2, img_all.height // 2), Image.LANCZOS)
-# img_all_2x.save("all_nodes_2x.png")
 
-# # Зберегти у 4 рази менший розмір
-# img_graph_4x = img_graph.resize((img_graph.width // 4, img_graph.height // 4), Image.LANCZOS)
-# img_graph_4x.save("graph_4x.png")
-# img_all_4x = img_all.resize((img_all.width // 4, img_all.height // 4), Image.LANCZOS)
-# img_all_4x.save("all_nodes_4x.png")
+
+
+
 
 
 
