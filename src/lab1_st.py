@@ -1,28 +1,26 @@
 import streamlit as st
 
-import os
 import time
-
 from collections import deque
-from PIL import Image, ImageDraw, ImageFont
-Image.MAX_IMAGE_PIXELS = None  # Вимикає перевірку на "decompression bomb"
 from math import atan2, cos, sin
 
-import plotly.graph_objs as go
-
 import numpy as np
+import pandas as pd
+import plotly.graph_objs as go
+import streamlit as st
+from PIL import Image, ImageDraw, ImageFont
 from scipy.integrate import solve_ivp
 
-import pandas as pd
+Image.MAX_IMAGE_PIXELS = None  # Вимикає перевірку на "decompression bomb"
 
 
 
+# MARK: st config
 st.set_page_config(
     page_title="Lab 1 TNPS",
     page_icon= "🧪",
     layout="wide" # wide, centered
 )
-
 
 st.markdown("""
     <style>
@@ -44,9 +42,6 @@ st.markdown("""
     .stAppDeployButton {
         display: none !important;
     }
-            
-
-
 
 
     [data-testid=stHeader] {
@@ -66,7 +61,6 @@ st.markdown("""
     [data-testid=stToolbar] > div * {
         pointer-events: auto;
     }
-
 
 
     </style>
@@ -112,7 +106,7 @@ with st.sidebar:
     # st.header("Параметри інтегрування")
     integration_time = st.slider(
         "Час інтегрування (t, сек)", 
-        min_value=100, max_value=20000, value=(0, 2500), step=100
+        min_value=100, max_value=20000, value=2500, step=100
     )
 
     lam_min_value = 0.0
@@ -122,29 +116,14 @@ with st.sidebar:
 
 
     st.write("Значення λ для блоків:")
-    # lam_b1_h = st.number_input("b1_h (1.1)", min_value=lam_min_value, max_value=lam_max_value, value=0.0005, format=lam_format_str, step=lam_step)
-    # lam_b1_s = st.number_input("b1_s (1.2)", min_value=lam_min_value, max_value=lam_max_value, value=0.0005, format=lam_format_str, step=lam_step)
-    # lam_b2   = st.number_input("b2 (2)",     min_value=lam_min_value, max_value=lam_max_value, value=0.0004, format=lam_format_str, step=lam_step)
-    # lam_b3   = st.number_input("b3 (3)",     min_value=lam_min_value, max_value=lam_max_value, value=0.0003, format=lam_format_str, step=lam_step)
-    # lam_b4   = st.number_input("b4 (4)",     min_value=lam_min_value, max_value=lam_max_value, value=0.00025, format=lam_format_str, step=lam_step)
-    # lam_b5_h = st.number_input("b5_h (5.1)", min_value=lam_min_value, max_value=lam_max_value, value=0.0005, format=lam_format_str, step=lam_step)
-    # lam_b5_s = st.number_input("b5_s (5.2)", min_value=lam_min_value, max_value=lam_max_value, value=0.0001, format=lam_format_str, step=lam_step)
 
-    lam_b1_h = round(st.number_input("b1_h (1)", min_value=lam_min_value, max_value=lam_max_value, value=0.0005, format=lam_format_str, step=lam_step), 6)
-    lam_b1_s = round(st.number_input("b1_s (2.1)", min_value=lam_min_value, max_value=lam_max_value, value=0.0005, format=lam_format_str, step=lam_step), 6)
-    lam_b2   = round(st.number_input("b2 (2.2)",     min_value=lam_min_value, max_value=lam_max_value, value=0.0004, format=lam_format_str, step=lam_step), 6)
-    lam_b3   = round(st.number_input("b3 (3.1)",     min_value=lam_min_value, max_value=lam_max_value, value=0.0003, format=lam_format_str, step=lam_step), 6)
-    lam_b4   = round(st.number_input("b4 (3.2)",     min_value=lam_min_value, max_value=lam_max_value, value=0.00025, format=lam_format_str, step=lam_step), 6)
-    lam_b5_h = round(st.number_input("b5_h (4)", min_value=lam_min_value, max_value=lam_max_value, value=0.0005, format=lam_format_str, step=lam_step), 6)
-    lam_b5_s = round(st.number_input("b5_s (5)", min_value=lam_min_value, max_value=lam_max_value, value=0.0001, format=lam_format_str, step=lam_step), 6)
-
-    st.write("lam_b1_h =", lam_b1_h)
-    st.write("lam_b1_s =", lam_b1_s)
-    st.write("lam_b2   =", lam_b2)
-    st.write("lam_b3   =", lam_b3)
-    st.write("lam_b4   =", lam_b4)
-    st.write("lam_b5_h =", lam_b5_h)
-    st.write("lam_b5_s =", lam_b5_s)
+    lam_b1_h = round(st.number_input("b1_h (1.1)", min_value=lam_min_value, max_value=lam_max_value, value=0.0005, format=lam_format_str, step=lam_step), 6)
+    lam_b1_s = round(st.number_input("b1_s (1.2)", min_value=lam_min_value, max_value=lam_max_value, value=0.0005, format=lam_format_str, step=lam_step), 6)
+    lam_b2   = round(st.number_input("b2 (2)",     min_value=lam_min_value, max_value=lam_max_value, value=0.0004, format=lam_format_str, step=lam_step), 6)
+    lam_b3   = round(st.number_input("b3 (3)",     min_value=lam_min_value, max_value=lam_max_value, value=0.0003, format=lam_format_str, step=lam_step), 6)
+    lam_b4   = round(st.number_input("b4 (4)",     min_value=lam_min_value, max_value=lam_max_value, value=0.00025, format=lam_format_str, step=lam_step), 6)
+    lam_b5_h = round(st.number_input("b5_h (5.1)", min_value=lam_min_value, max_value=lam_max_value, value=0.0005, format=lam_format_str, step=lam_step), 6)
+    lam_b5_s = round(st.number_input("b5_s (5.2)", min_value=lam_min_value, max_value=lam_max_value, value=0.0001, format=lam_format_str, step=lam_step), 6)
 
 
 start_time = time.time()
@@ -216,46 +195,41 @@ class LogicBlock:
 blocks = {
     0:    LogicBlock(0, "Start"),
 
-    1:  LogicBlock(1, "H", lam=lam_b1_h),
-    2.1:  LogicBlock(2.1, "H", lam=lam_b1_s),
-    2.2:  LogicBlock(2.2, "S", lam=lam_b2),
+    1.1:  LogicBlock(1.1, "H", lam=lam_b1_h),
+    1.2:  LogicBlock(1.2, "S", lam=lam_b1_s),
 
-    3.1:  LogicBlock(3.1, "H", lam=lam_b3),
-    3.2:  LogicBlock(3.2, "S", lam=lam_b4),
+    2:    LogicBlock(2, "H", lam=lam_b2),
+    3:    LogicBlock(3, "H", lam=lam_b3),
+    4:    LogicBlock(4, "H", lam=lam_b4),
 
-    4:    LogicBlock(4, "H", lam=lam_b5_h),
-
-    5:  LogicBlock(5, "H", lam=lam_b5_s),
+    5.1:  LogicBlock(5.1, "H", lam=lam_b5_h),
+    5.2:  LogicBlock(5.2, "S", lam=lam_b5_s),
 
     6:    LogicBlock(6, "End"),
 }
 
 # залежності блоків, які не можуть бути одночасно справними/поламаними
 mutual_exclusions = [
-    (2.1, 2.2),
-    (3.1, 3.2),
+    (1.1, 1.2),
+    (5.1, 5.2)
 ]
 
-blocks[0].connect_to(blocks[1])
-blocks[0].connect_to(blocks[3.1])
+blocks[0].connect_to(blocks[1.1])
+blocks[0].connect_to(blocks[2])
+blocks[0].connect_to(blocks[5.1])
 
+blocks[1.1].connect_to(blocks[1.2])
+blocks[5.1].connect_to(blocks[5.2])
 
-blocks[1].connect_to(blocks[2.1])
-blocks[2.1].connect_to(blocks[2.2])
+blocks[1.2].connect_to(blocks[3])
+blocks[1.2].connect_to(blocks[4])
 
-blocks[3.1].connect_to(blocks[3.2])
+blocks[2].connect_to(blocks[3])
+blocks[2].connect_to(blocks[4])
 
-
-blocks[2.2].connect_to(blocks[4])
-blocks[2.2].connect_to(blocks[5])
-
-blocks[3.2].connect_to(blocks[4])
-blocks[3.2].connect_to(blocks[5])
-
-
+blocks[3].connect_to(blocks[6])
 blocks[4].connect_to(blocks[6])
-blocks[5].connect_to(blocks[6])
-
+blocks[5.2].connect_to(blocks[6])
 
 
 
@@ -864,8 +838,8 @@ def build_kolmogorov_equations(valid_nodes):
 eqs = build_kolmogorov_equations(valid_nodes)
 # Вивід у консоль
     # print("\nСистема диференційних рівнянь Колмогорова–Чепмена:")
-    # for eq in eqs:
-    #     print(eq)
+for eq in eqs:
+    print(eq)
 
 def eqs_to_latex(eqs):
     latex_eqs = []
@@ -876,9 +850,7 @@ def eqs_to_latex(eqs):
         latex_eqs.append(eq_latex)
     return latex_eqs
 
-with st.expander("Equation (LaTeX converted)", expanded=False):
-    # for eq_latex in eqs_to_latex(eqs):
-    #     st.latex(eq_latex, width="content")
+with st.expander("Equations", expanded=False):
     for idx, eq_latex in enumerate(eqs_to_latex(eqs), 1):
         st.latex(f"{idx}.\\quad {eq_latex}", width="content")
 
@@ -964,21 +936,14 @@ def solve_kolmogorov(valid_nodes, t_span, P0=None, t_eval=None):
 
 
 
-# st.write(integration_time)
 
 
-# інтегруємо з integration_time[0] до integration_time[1]
-if integration_time[0] == 0:
-    P0 = None  # стандартний початковий розподіл
-else:
-    # інтегруємо з нуля до integration_time[0], щоб отримати початковий розподіл
-    ode_start_time = time.time()
-    sol_init = solve_kolmogorov(valid_nodes, t_span=(0, integration_time[0]))
-    time_stats['ode_init'] = time.time() - ode_start_time
-    P0 = sol_init.y[:, -1]  # останній розподіл на момент integration_time[0]
+P0 = None
 
 ode_start_time = time.time()
-sol = solve_kolmogorov(valid_nodes, t_span=integration_time, P0=P0)
+
+sol = solve_kolmogorov(valid_nodes, t_span=(0, integration_time), P0=P0)
+
 time_stats['solve_kolmogorov'] = time.time() - ode_start_time
 
 
@@ -1003,7 +968,7 @@ for k, label in enumerate(STATE_LABELS):
 fig.update_layout(
     xaxis_title='t',
     yaxis_title='Ймовірність',
-    title='Графік ймовірностей станів',
+    # title='Графік ймовірностей станів',
     legend=dict(font=dict(size=12), orientation="h"),
     height=625,
     dragmode='pan',
@@ -1012,7 +977,9 @@ fig.update_layout(
 )
 
 
-with st.container(border=True):
+# with st.container(border=True):
+with st.expander(f"Графік ймовірностей станів", 
+                 expanded=True):
     st.plotly_chart(fig, use_container_width=True, 
                         config={
                             # "scrollZoom": True, 
@@ -1063,8 +1030,9 @@ with st.expander(f"Середнє значення тривалості робо
 
 
 # MARK: Probability Table and Bar Chart at Specific Time
-with st.container(border=True):
-
+# with st.container(border=True):
+with st.expander(f"Розподіл ймовірностей по станах", 
+                 expanded=True):
     t_col1, t_col2, t_col3, t_col4, t_col5 = st.columns([1, 1, 1, 1, 1])
 
     with t_col1:
@@ -1172,7 +1140,9 @@ time_stats['state_probs_chart'] = time.time() - state_probs_chart_start_time
 
 
 # MARK: draw and save images
-with st.container(border=True):
+# with st.container(border=True):
+with st.expander(f"Graph", 
+                 expanded=True):
     if st.button("Generate and Draw Graph"):
         with st.spinner("Wait for it...", show_time=True):
 
