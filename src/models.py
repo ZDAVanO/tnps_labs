@@ -20,8 +20,6 @@ class LogicBlock:
 
     def is_working(self):
         return self.state == 1
-    
-
 
 
 
@@ -57,13 +55,6 @@ def can_reach(blocks, start_id, end_id, broken_ids):
 
     # print(f"Cannot reach end block {end_id}")
     return False
-
-
-
-
-
-
-
 
 
 
