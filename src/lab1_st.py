@@ -271,17 +271,17 @@ def can_reach(start_id, end_id, broken_ids):
 
 ## MARK: GraphNode
 class GraphNode:
-    def __init__(self, row, idx, num, node_parent, block_states=None):
+    def __init__(self, row, idx, num, node_parent, block_states=None, block_ids=None, block_types=None, block_lams=None):
         self.row = row
         self.idx = idx
         self.num = num  # порядковий номер валідної ноди
         self.node_parent = node_parent
         # Якщо block_states не передано — всі блоки справні
-        block_ids = [b.id for b in blocks.values() if b.type not in ["Start", "End"]]
-        self.block_states = block_states if block_states is not None else {bid: 1 for bid in block_ids}
+        self.block_ids = block_ids if block_ids is not None else []
+        self.block_states = block_states if block_states is not None else {bid: 1 for bid in self.block_ids}
         # Зберігаємо типи блоків для зручності
-        self.block_types = {bid: blocks[bid].type for bid in block_ids}
-        self.block_lams = {bid: blocks[bid].lam for bid in block_ids}  # <--- додано
+        self.block_types = block_types if block_types is not None else {}
+        self.block_lams = block_lams if block_lams is not None else {}
 
         self.inputs = []
         self.outputs = []
@@ -299,30 +299,16 @@ class GraphNode:
         self.outputs.append(other_block.idx)
         other_block.inputs.append(self.idx)
 
-    # def print_states(self):
-    #     print(f"Node (idx={self.idx}, row={self.row}, parent={self.node_parent}):")
-    #     for bid in sorted(self.block_states):
-    #         block_type = self.block_types[bid]
-    #         is_integer = isinstance(bid, int) or (isinstance(bid, float) and bid.is_integer())
-    #         state = self.block_states[bid]
-
-    #         # Формуємо рядок
-    #         if block_type and  not is_integer:
-    #             print(f"{int(bid) if bid == int(bid) else int(bid)}.{block_type} - {state} {"x" if bid in self.locked_blocks else ""}")
-    #         else:
-    #             print(f"{int(bid)}   - {state} ")
-
     def print_states_lines(self):
         lines = []
         lines.append(f"Node (idx={self.idx}, num={self.num}, row={self.row}, parent={self.node_parent}):")
         for bid in sorted(self.block_states):
-            block_type = self.block_types[bid]
+            block_type = self.block_types.get(bid, None)
             is_integer = isinstance(bid, int) or (isinstance(bid, float) and bid.is_integer())
             state = self.block_states[bid]
-
             # Формуємо рядок
-            if block_type and  not is_integer:
-                lines.append(f"{int(bid) if bid == int(bid) else int(bid)}.{block_type} - {state} {"x" if bid in self.locked_blocks else ""}")
+            if block_type and not is_integer:
+                lines.append(f"{int(bid) if bid == int(bid) else int(bid)}.{block_type} - {state} {'x' if bid in self.locked_blocks else ''}")
             else:
                 lines.append(f"{int(bid)}   - {state} ")
         return lines
@@ -335,6 +321,8 @@ class GraphNode:
 def generate_graph():
     valid_node_num = 1
     block_ids = [b.id for b in blocks.values() if b.type not in ["Start", "End"]]
+    block_types = {bid: blocks[bid].type for bid in block_ids}
+    block_lams = {bid: blocks[bid].lam for bid in block_ids}
     total_blocks = len(block_ids)
 
     output_lines = []  # для streamlit
@@ -343,7 +331,7 @@ def generate_graph():
     idx = 1
     row = 1
     start_states = {bid: 1 for bid in block_ids}
-    start_node = GraphNode(row, idx, valid_node_num, None, start_states)
+    start_node = GraphNode(row, idx, valid_node_num, None, start_states, block_ids, block_types, block_lams)
     valid_node_num += 1
 
     for line in start_node.print_states_lines():
@@ -406,7 +394,7 @@ def generate_graph():
 
             state_tuple = tuple(sorted(new_states.items()))
             duplicate_idx = seen.get(state_tuple)
-            node = GraphNode(next_row, idx, valid_node_num, parent_idx, new_states)
+            node = GraphNode(next_row, idx, valid_node_num, parent_idx, new_states, block_ids, block_types, block_lams)
             node.locked_blocks = locked_blocks
 
             for line in node.print_states_lines():
@@ -418,7 +406,7 @@ def generate_graph():
             if not can_reach_result:
                 node.is_dead = True
 
-            output_lines.append(f"Endpoint check: {"✅" if can_reach_result else "❌"}")
+            output_lines.append(f"Endpoint check: {'✅' if can_reach_result else '❌'}")
 
             if duplicate_idx is not None:
                 # Connect parent to the original node (duplicate_idx) instead of the duplicate
