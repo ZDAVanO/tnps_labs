@@ -3,13 +3,23 @@
 
 # MARK: LogicBlock
 class LogicBlock:
-    def __init__(self, block_id, type, state=1, lam=0.0):
+    def __init__(self, block_id, lb_type, state=1, lam=0.0, mu=0.0):
         self.id = block_id
-        self.type = type
+        self.type = lb_type # "H" (Hardware), "S" (Software), "Start", "End"
         self.state = state
         self.inputs = []
         self.outputs = []
+
         self.lam = lam  # failure rate (λ)
+        self.mu = mu # repair rate (μ)
+        if mu == 0.0:
+            self.mu = lam * 10  # default repair rate
+        
+
+        self.s_updates = 0
+        if self.type == "S":
+            self.s_updates = 1
+
 
     def connect_to(self, other_block):
         self.outputs.append(other_block.id)
@@ -89,6 +99,7 @@ class GraphNode:
         self.locked_blocks = []
 
         self.is_dead = False
+        self.fixable = True
 
     def mark_duplicate_of(self, other_node):
         self.duplicate_of.append(other_node.idx)

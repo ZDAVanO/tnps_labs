@@ -107,68 +107,68 @@ with st.sidebar:
 
 
 # MARK: Blocks
-blocks = {
-    0:    LogicBlock(0, "Start"),
-
-    1.1:  LogicBlock(1.1, "H", lam=lam_b1_h),
-    1.2:  LogicBlock(1.2, "S", lam=lam_b1_s),
-
-    2:    LogicBlock(2, "H", lam=lam_b2),
-    3:    LogicBlock(3, "H", lam=lam_b3),
-    4:    LogicBlock(4, "H", lam=lam_b4),
-
-    5.1:  LogicBlock(5.1, "H", lam=lam_b5_h),
-    5.2:  LogicBlock(5.2, "S", lam=lam_b5_s),
-
-    6:    LogicBlock(6, "End"),
-}
-
-# dependencies of blocks that cannot be simultaneously working/faulty
-mutual_exclusions = [
-    (1.1, 1.2),
-    (5.1, 5.2)
-]
-
-blocks[0].connect_to(blocks[1.1])
-blocks[0].connect_to(blocks[2])
-blocks[0].connect_to(blocks[5.1])
-
-blocks[1.1].connect_to(blocks[1.2])
-blocks[5.1].connect_to(blocks[5.2])
-
-blocks[1.2].connect_to(blocks[3])
-blocks[1.2].connect_to(blocks[4])
-
-blocks[2].connect_to(blocks[3])
-blocks[2].connect_to(blocks[4])
-
-blocks[3].connect_to(blocks[6])
-blocks[4].connect_to(blocks[6])
-blocks[5.2].connect_to(blocks[6])
-
-
-
 # blocks = {
 #     0:    LogicBlock(0, "Start"),
 
-#     1:  LogicBlock(1, "H", lam=lam_b1_h),
-#     2:  LogicBlock(2, "H", lam=lam_b1_s),
-#     3:  LogicBlock(3, "H", lam=lam_b2),
+#     1.1:  LogicBlock(1.1, "H", lam=lam_b1_h),
+#     1.2:  LogicBlock(1.2, "S", lam=lam_b1_s),
 
-#     4:  LogicBlock(4, "End"),
+#     2:    LogicBlock(2, "H", lam=lam_b2),
+#     3:    LogicBlock(3, "H", lam=lam_b3),
+#     4:    LogicBlock(4, "H", lam=lam_b4),
+
+#     5.1:  LogicBlock(5.1, "H", lam=lam_b5_h),
+#     5.2:  LogicBlock(5.2, "S", lam=lam_b5_s),
+
+#     6:    LogicBlock(6, "End"),
 # }
 
 # # dependencies of blocks that cannot be simultaneously working/faulty
-# mutual_exclusions = []
+# mutual_exclusions = [
+#     (1.1, 1.2),
+#     (5.1, 5.2)
+# ]
 
-# blocks[0].connect_to(blocks[1])
+# blocks[0].connect_to(blocks[1.1])
+# blocks[0].connect_to(blocks[2])
+# blocks[0].connect_to(blocks[5.1])
 
+# blocks[1.1].connect_to(blocks[1.2])
+# blocks[5.1].connect_to(blocks[5.2])
 
-# blocks[1].connect_to(blocks[2])
-# blocks[1].connect_to(blocks[3])
+# blocks[1.2].connect_to(blocks[3])
+# blocks[1.2].connect_to(blocks[4])
 
+# blocks[2].connect_to(blocks[3])
 # blocks[2].connect_to(blocks[4])
-# blocks[3].connect_to(blocks[4])
+
+# blocks[3].connect_to(blocks[6])
+# blocks[4].connect_to(blocks[6])
+# blocks[5.2].connect_to(blocks[6])
+
+
+
+blocks = {
+    0:    LogicBlock(0, "Start"),
+
+    1:  LogicBlock(1, "H", lam=lam_b1_h),
+    2:  LogicBlock(2, "H", lam=lam_b1_s),
+    3:  LogicBlock(3, "H", lam=lam_b2),
+
+    4:  LogicBlock(4, "End"),
+}
+
+# dependencies of blocks that cannot be simultaneously working/faulty
+mutual_exclusions = []
+
+blocks[0].connect_to(blocks[1])
+
+
+blocks[1].connect_to(blocks[2])
+blocks[1].connect_to(blocks[3])
+
+blocks[2].connect_to(blocks[4])
+blocks[3].connect_to(blocks[4])
 
 
 
@@ -180,7 +180,8 @@ def generate_graph():
     block_ids = [b.id for b in blocks.values() if b.type not in ["Start", "End"]]
     block_types = {bid: blocks[bid].type for bid in block_ids}
     block_lams = {bid: blocks[bid].lam for bid in block_ids}
-    total_blocks = len(block_ids)
+    block_mus = {bid: blocks[bid].mu for bid in block_ids}
+    # total_blocks = len(block_ids)
 
     output_lines = []  # for streamlit
 
