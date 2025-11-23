@@ -78,7 +78,8 @@ class GraphNode:
                  block_states=None, 
                  block_ids=None, 
                  block_types=None, 
-                 block_lams=None):
+                 block_lams=None,
+                 block_mus=None):
         
         self.row = row
         self.idx = idx
@@ -90,9 +91,13 @@ class GraphNode:
         # Store block types for convenience
         self.block_types = block_types if block_types is not None else {}
         self.block_lams = block_lams if block_lams is not None else {}
+        self.block_mus = block_mus if block_mus is not None else {}
 
         self.inputs = []
         self.outputs = []
+
+        self.repair_inputs = []
+        self.repair_outputs = []
 
         self.duplicate_of = []
 

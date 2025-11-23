@@ -151,7 +151,7 @@ with st.sidebar:
 blocks = {
     0:    LogicBlock(0, "Start"),
 
-    1:  LogicBlock(1, "H", lam=lam_b1_h),
+    1:  LogicBlock(1, "S", lam=lam_b1_h),
     2:  LogicBlock(2, "H", lam=lam_b1_s),
     3:  LogicBlock(3, "H", lam=lam_b2),
 
@@ -189,7 +189,7 @@ def generate_graph():
     idx = 1
     row = 1
     start_states = {bid: 1 for bid in block_ids}
-    start_node = GraphNode(row, idx, valid_node_num, None, start_states, block_ids, block_types, block_lams)
+    start_node = GraphNode(row, idx, valid_node_num, None, start_states, block_ids, block_types, block_lams, block_mus)
     valid_node_num += 1
 
     for line in start_node.print_states_lines():
@@ -201,14 +201,14 @@ def generate_graph():
     idx += 1
 
     # All unique states to avoid duplicates
-    seen = {}
-    seen[tuple(sorted(start_states.items()))] = 1
+    # seen = {}
+    # seen[tuple(sorted(start_states.items()))] = 1
+    seen = {tuple(sorted(start_states.items())): 1}
 
-    # List of all valid graph nodes
+    # Init lists
     valid_nodes = [start_node]
     node_by_idx = {start_node.idx: start_node}
-
-    all_nodes = [start_node]  # <-- new list for all nodes
+    all_nodes = [start_node]
 
     while queue:
         current_node = queue.popleft()
@@ -217,31 +217,62 @@ def generate_graph():
         parent_idx = current_node.idx
         next_row = row + 1
 
-        # Find all blocks that are not yet broken
-        working_blocks = [bid for bid, state in current_states.items() if state == 1]
-        # If all blocks are already broken — do not proceed further
-        if not working_blocks:
-            continue
 
 
-        filtered_blocks = []
-        for bid in working_blocks:
-            skip = False
+        # --- 0. Перевірка: чи працює система в ПОТОЧНОМУ стані? ---
+        # Нам це треба знати, щоб вирішити, чи можна ламати далі.
+        current_broken_ids = [bid for bid, state in current_states.items() if state == 0]
+        is_current_system_alive = can_reach(blocks, 0, max(blocks.keys()), current_broken_ids)
+
+
+
+        # --- 1. Збираємо всі можливі переходи (Transitions) ---
+        transitions = [] # Список кортежів: (block_id, new_state_value, action_type)
+
+        if is_current_system_alive:  # <--- ДОДАНО ЦЮ УМОВУ
+        # Failure transitions
+        # Перевірка: якщо блок у парі виключення вже зламаний, другий не можна ламати.
+            working_blocks = [bid for bid, state in current_states.items() if state == 1]
+        # filtered_blocks = []
+
+            # До створення нового вузла.
+            # Якщо заблоковано кимось — не додаємо
+            for bid in working_blocks:
+                # Перевіряємо, чи є хоч одна умова, яка блокує цей bid
+                is_blocked = any(
+                    (bid == a and current_states.get(b, 1) == 0) or 
+                    (bid == b and current_states.get(a, 1) == 0)
+                    for a, b in mutual_exclusions
+                )
+                if not is_blocked:
+                    # filtered_blocks.append(bid)
+                    transitions.append((bid, 0, "fail"))
+
+        # Б. ЛОГІКА РЕМОНТУ (0 -> 1)  <-- НОВИЙ ФУНКЦІОНАЛ
+        broken_blocks = [bid for bid, state in current_states.items() if state == 0]
+        for bid in broken_blocks:
+            # Перевіряємо, чи дозволено ремонтувати
+            # Не можна вмикати блок, якщо його партнер зараз ПРАЦЮЄ (1)
+            can_repair = True
             for a, b in mutual_exclusions:
-                if bid == a and current_states.get(b, 1) == 0:
-                    skip = True
-                if bid == b and current_states.get(a, 1) == 0:
-                    skip = True
-            if not skip:
-                filtered_blocks.append(bid)
-
+                if bid == a and current_states.get(b, 1) == 1:
+                    can_repair = False; break
+                if bid == b and current_states.get(a, 1) == 1:
+                    can_repair = False; break
+            
+            if can_repair:
+                transitions.append((bid, 1, "repair"))
 
         # For each block that is not yet broken, create a new state with an additional failure
-        for broken_bid in filtered_blocks:
+        # for broken_bid in filtered_blocks:
+        for target_bid, target_val, action_type in transitions:
             new_states = current_states.copy()
-            new_states[broken_bid] = 0
+            # new_states[broken_bid] = 0
+            new_states[target_bid] = target_val
 
-
+            # Визначаємо "заблоковані" блоки — ті, які не можна ламати через взаємні виключення.
+            # Це потрібно для коректного відображення стану вузла.
+            # "вішає ярлик" на блоки, які залишилися цілими.
             locked_blocks = []
             for a, b in mutual_exclusions:
                 if (new_states.get(a, 1) == 0) and (new_states.get(b, 1) == 1):
@@ -252,68 +283,61 @@ def generate_graph():
 
             state_tuple = tuple(sorted(new_states.items()))
             duplicate_idx = seen.get(state_tuple)
-            node = GraphNode(next_row, idx, valid_node_num, parent_idx, new_states, block_ids, block_types, block_lams)
+            
+            node = GraphNode(next_row, idx, valid_node_num, parent_idx, new_states, block_ids, block_types, block_lams, block_mus)
             node.locked_blocks = locked_blocks
+
+            # node.action_type = action_type # Можна зберегти тип дії для розмальовки стрілочок (червона/зелена)
+            # node.changed_block = target_bid # Який блок змінив стан
 
             for line in node.print_states_lines():
                 output_lines.append(line)
+            output_lines.append(f"Action: {action_type.upper()} block {target_bid}")
 
-
-            broken_ids = [bid for bid, state in new_states.items() if state == 0]
+            broken_ids = [bid for bid, state in new_states.items() if state == 0] 
+            # broken_ids - список зламаних блоків у новому стані
             can_reach_result = can_reach(blocks, 0, max(blocks.keys()), broken_ids)
             if not can_reach_result:
                 node.is_dead = True
 
             output_lines.append(f"Endpoint check: {'✅' if can_reach_result else '❌'}")
 
+
+            # --- LOGIC BRANCHING ---
+
             if duplicate_idx is not None:
-                # Connect parent to the original node (duplicate_idx) instead of the duplicate
+                # --- CASE 1: DUPLICATE ---
                 if parent_idx in node_by_idx and duplicate_idx in node_by_idx:
                     node_by_idx[parent_idx].connect_to(node_by_idx[duplicate_idx])
                     node.mark_duplicate_of(node_by_idx[duplicate_idx])
-
+                
                 output_lines.append(f"Node {idx}: is Duplicate of {duplicate_idx}")
-                output_lines.append("-" * 30)
-
-                all_nodes.append(node) # <-- add every node created
-
-                idx += 1
-                continue
-
-            
-            if not can_reach_result:
-                output_lines.append("-" * 30)
-                # node.is_dead = True
-
-                # Add connection between parent and child node
+                
+            else:
+                # --- CASE 2: NEW UNIQUE NODE (Dead or Alive) ---
+                valid_nodes.append(node)
+                # Only increment valid_node_num for unique nodes (based on original logic logic)
+                valid_node_num += 1 
+                node_by_idx[idx] = node
+                seen[state_tuple] = idx
+                
+                # Connect parent to this new node
                 if parent_idx in node_by_idx:
                     node_by_idx[parent_idx].connect_to(node)
+                
+                # If system is still working, continue exploring (add to queue)
+                # if can_reach_result:
+                #     queue.append(node)
 
-                valid_nodes.append(node)
-                valid_node_num += 1
-                node_by_idx[idx] = node
+                # Додаємо в чергу, навіть якщо стан "мертвий"?
+                # Зазвичай так, бо з мертвого стану можна "полагодитись" назад у живий.
+                # Але якщо ви хочете зупиняти симуляцію при відмові системи, то лишіть `if can_reach_result`.
+                # Для повного графа станів краще додавати завжди:
+                queue.append(node)
 
-                seen[state_tuple] = idx
-
-                all_nodes.append(node)  # <-- add every node created
-
-                idx += 1
-
-                continue
-
-            all_nodes.append(node)  # <-- add every node created
-
-            # Add connection between parent and child node
-            if parent_idx in node_by_idx:
-                node_by_idx[parent_idx].connect_to(node)
-
-            valid_nodes.append(node)
-            valid_node_num += 1
-            node_by_idx[idx] = node
-
+            # --- FINALIZING ITERATION ---
+            all_nodes.append(node)   # Add to all_nodes list regardless of type
             output_lines.append("-" * 30)
-            queue.append(node)  # Added only if not duplicate and there is a path to the end
-            seen[state_tuple] = idx
             idx += 1
 
     return valid_nodes, all_nodes, output_lines
@@ -354,6 +378,17 @@ def get_valid_nodes_connections_text(nodes: List[GraphNode]):
                 for bid, st1, st2 in diff:
                     lam = node.block_lams.get(bid, None)
                     lines.append(f"    Input from node {inp_num}: Block {bid} λ={lam} (state: {st2}→{st1})")
+
+        lines.append(f"  Repair Inputs: {node.repair_inputs}")
+        for inp_num in node.repair_inputs:
+            inp_node = next((n for n in nodes if n.idx == inp_num), None)
+            if inp_node:
+                diff = [(bid, node.block_states[bid], inp_node.block_states[bid]) 
+                        for bid in node.block_states if node.block_states[bid] != inp_node.block_states[bid]]
+                for bid, st1, st2 in diff:
+                    mu = node.block_mus.get(bid, None)
+                    lines.append(f"    Repair from node {inp_num}: Block {bid} μ={mu} (state: {st2}→{st1})")
+        
         lines.append(f"  Outputs: {node.outputs}")
         for out_num in node.outputs:
             out_node = next((n for n in nodes if n.idx == out_num), None)
@@ -363,6 +398,17 @@ def get_valid_nodes_connections_text(nodes: List[GraphNode]):
                 for bid, st1, st2 in diff:
                     lam = node.block_lams.get(bid, None)
                     lines.append(f"    Output to node {out_num}: Block {bid} λ={lam} (state: {st1}→{st2})")
+
+        lines.append(f"  Repair Outputs: {node.repair_outputs}")
+        for out_num in node.repair_outputs:
+            out_node = next((n for n in nodes if n.idx == out_num), None)
+            if out_node:
+                diff = [(bid, node.block_states[bid], out_node.block_states[bid]) 
+                        for bid in node.block_states if node.block_states[bid] != out_node.block_states[bid]]
+                for bid, st1, st2 in diff:
+                    mu = node.block_mus.get(bid, None)
+                    lines.append(f"    Repair to node {out_num}: Block {bid} μ={mu} (state: {st1}→{st2})")
+                    
         lines.append("-" * 40)
     return "\n".join(lines)
 
@@ -402,6 +448,24 @@ def build_kolmogorov_equations_latex(nodes: List[GraphNode]):
                 for bid, st1, st2 in diff:
                     lam = node.block_lams.get(bid, None)
                     out_terms.append(f"{lam} {P}")
+        # Repair transitions
+        for inp_num in getattr(node, "repair_inputs", []):
+            inp_node = next((n for n in nodes if n.idx == inp_num), None)
+            if inp_node:
+                diff = [(bid, node.block_states[bid], inp_node.block_states[bid]) 
+                        for bid in node.block_states if node.block_states[bid] != inp_node.block_states[bid]]
+                for bid, st1, st2 in diff:
+                    mu = node.block_mus.get(bid, None)
+                    in_terms.append(f"{mu} P_{{{inp_node.num}}}(t)")
+        for out_num in getattr(node, "repair_outputs", []):
+            out_node = next((n for n in nodes if n.idx == out_num), None)
+            if out_node:
+                diff = [(bid, node.block_states[bid], out_node.block_states[bid]) 
+                        for bid in node.block_states if node.block_states[bid] != out_node.block_states[bid]]
+                for bid, st1, st2 in diff:
+                    mu = node.block_mus.get(bid, None)
+                    out_terms.append(f"{mu} {P}")
+        
         # Form equation
         rhs = ""
         if in_terms:
@@ -475,6 +539,33 @@ def kolmogorov_rhs(t, P, nodes: List[GraphNode]):
                     # if lam:
                     if lam is not None:
                         out_terms.append(lam * P[i])
+                    else:
+                        raise ValueError(f"Lambda not found for block {bid} in node {node.idx}")
+
+        # Repair transitions
+        for inp_num in getattr(node, "repair_inputs", []):
+            inp_idx = next((j for j, n in enumerate(nodes) if n.idx == inp_num), None)
+            if inp_idx is not None:
+                diff = [(bid, node.block_states[bid], nodes[inp_idx].block_states[bid]) 
+                        for bid in node.block_states 
+                        if node.block_states[bid] != nodes[inp_idx].block_states[bid]]
+                for bid, st1, st2 in diff:
+                    mu = node.block_mus.get(bid, None)
+                    if mu is not None:
+                        in_terms.append(mu * P[inp_idx])
+                    else:
+                        raise ValueError(f"Lambda not found for block {bid} in node {node.idx}")
+
+        for out_num in getattr(node, "repair_outputs", []):
+            out_idx = next((j for j, n in enumerate(nodes) if n.idx == out_num), None)
+            if out_idx is not None:
+                diff = [(bid, node.block_states[bid], nodes[out_idx].block_states[bid]) 
+                        for bid in node.block_states 
+                        if node.block_states[bid] != nodes[out_idx].block_states[bid]]
+                for bid, st1, st2 in diff:
+                    mu = node.block_mus.get(bid, None)
+                    if mu is not None:
+                        out_terms.append(mu * P[i])
                     else:
                         raise ValueError(f"Lambda not found for block {bid} in node {node.idx}")
 
@@ -709,14 +800,15 @@ with st.expander(f"Draw Graph", expanded=True):
             t0_graph = time.time()
             img_graph = draw_graph(valid_nodes)
             time_stats['draw_graph'] = time.time() - t0_graph
-            # with st.expander("Graph of Valid Nodes", expanded=True):
-            #     st.image(img_graph, caption="Graph of Valid Nodes", width="stretch")
+            with st.expander("Graph of Valid Nodes", expanded=True):
+                st.image(img_graph, caption="Graph of Valid Nodes", width="stretch")
+
             # Timing for drawing all nodes
             t0_all = time.time()
             img_all = draw_nodes(all_nodes)
             time_stats['draw_all_nodes'] = time.time() - t0_all
-            # with st.expander("All Generated Nodes", expanded=True):
-            #     st.image(img_all, caption="All Generated Nodes", width="stretch")
+            with st.expander("All Generated Nodes", expanded=True):
+                st.image(img_all, caption="All Generated Nodes", width="stretch")
 
             t0_save_images = time.time()
             img_graph.save("images/graph.png")
