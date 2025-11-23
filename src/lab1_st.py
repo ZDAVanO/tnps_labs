@@ -293,11 +293,11 @@ def generate_graph():
             # Перевіряємо, чи дозволено ремонтувати
             # Не можна вмикати блок, якщо його партнер зараз ПРАЦЮЄ (1)
             can_repair = True
-            for a, b in mutual_exclusions:
-                if bid == a and current_states.get(b, 1) == 1:
-                    can_repair = False; break
-                if bid == b and current_states.get(a, 1) == 1:
-                    can_repair = False; break
+            # for a, b in mutual_exclusions:
+            #     if bid == a and current_states.get(b, 1) == 1:
+            #         can_repair = False; break
+            #     if bid == b and current_states.get(a, 1) == 1:
+            #         can_repair = False; break
             
             if can_repair:
 
@@ -412,8 +412,12 @@ valid_nodes, all_nodes, output_lines = generate_graph()
 st.write(f"{len(all_nodes)} nodes generated / {len(valid_nodes)} valid.")
 
 # Output via streamlit
-with st.expander("Graph Generation Output", expanded=False):
-    st.code('\n'.join(output_lines), language="None")
+tab_gen_conn, tab_eq, tab_charts, tab_graph = st.tabs([
+    "Logs", 
+    "Equations", 
+    "Charts & Reliability", 
+    "Graph Visualization"
+])
 
 
 
@@ -477,8 +481,14 @@ def get_valid_nodes_connections_text(nodes: List[GraphNode]):
     return "\n".join(lines)
 
 # For Streamlit:
-with st.expander("Valid Nodes and Connections", expanded=False):
-    st.code(get_valid_nodes_connections_text(valid_nodes), language="None")
+with tab_gen_conn:
+    col_gen, col_conn = st.columns(2)
+    with col_gen:
+        st.subheader("Generation Log")
+        st.code('\n'.join(output_lines), language="None")
+    with col_conn:
+        st.subheader("Connections")
+        st.code(get_valid_nodes_connections_text(valid_nodes), language="None")
 
 
 
@@ -549,7 +559,7 @@ def build_kolmogorov_equations_latex(nodes: List[GraphNode]):
 
 eqs_latex = build_kolmogorov_equations_latex(valid_nodes)
 
-with st.expander("Equations", expanded=False):
+with tab_eq:
     for idx, eq_latex in enumerate(eqs_latex, 1):
         st.latex(f"{idx}.\\quad {eq_latex}", width="content")
 
@@ -697,12 +707,13 @@ fig.update_layout(
 
 
 # with st.container(border=True):
-with st.expander(f"State probabilities chart", expanded=True):
-    st.plotly_chart(fig, use_container_width=True, 
-                        config={
-                            # "scrollZoom": True, 
-                            "displayModeBar": True
-                            })
+with tab_charts:
+    with st.expander("State probabilities chart", expanded=True):
+        st.plotly_chart(fig, use_container_width=True, 
+                            config={
+                                # "scrollZoom": True, 
+                                "displayModeBar": True
+                                })
 
 
 
@@ -737,114 +748,115 @@ fig_alive.update_layout(
 # Mean time to failure (MTTF)
 mttf = np.trapezoid(alive_probs_sum, sol.t)
 
-with st.expander(f"Mean time to failure `{mttf:.6f}`", 
-                 expanded=True):
-    st.plotly_chart(fig_alive, use_container_width=True)
+with tab_charts:
+    with st.expander(f"Mean time to failure `{mttf:.6f}`", expanded=True):
+        st.plotly_chart(fig_alive, use_container_width=True)
 
 
 
 
 
 # MARK: Probability Table and Bar Chart at Specific Time
-with st.expander(f"State probability distribution", expanded=True):
-    t_col1, t_col2, t_col3, t_col4, t_col5 = st.columns([1, 1, 1, 1, 1])
+with tab_charts:
+    with st.expander("State probability distribution", expanded=True):
+        t_col1, t_col2, t_col3, t_col4, t_col5 = st.columns([1, 1, 1, 1, 1])
 
-    with t_col1:
-        query_time = st.number_input(
-            "Time t for viewing probabilities:",
-            # min_value=float(sol.t[0]),
-            # max_value=float(sol.t[-1]),
-            # value=float(sol.t[0]),
-            # step=1.0,
-            # format="%.2f"
+        with t_col1:
+            query_time = st.number_input(
+                "Time t for viewing probabilities:",
+                # min_value=float(sol.t[0]),
+                # max_value=float(sol.t[-1]),
+                # value=float(sol.t[0]),
+                # step=1.0,
+                # format="%.2f"
 
-            min_value=int(sol.t[0]),
-            max_value=int(sol.t[-1]),
-            value=int(sol.t[0]),
-            step=10,
-            format="%d"
-        )
+                min_value=int(sol.t[0]),
+                max_value=int(sol.t[-1]),
+                value=int(sol.t[0]),
+                step=10,
+                format="%d"
+            )
 
-    # Find index of time closest to user input query_time
-    idx = np.abs(sol.t - query_time).argmin()
-    # Select probabilities for all states at this time point
-    probs = sol.y[:, idx]
+        # Find index of time closest to user input query_time
+        idx = np.abs(sol.t - query_time).argmin()
+        # Select probabilities for all states at this time point
+        probs = sol.y[:, idx]
 
-    with t_col2:
-        st.markdown(f"t = {sol.t[idx]:.2f}")
+        with t_col2:
+            st.markdown(f"t = {sol.t[idx]:.2f}")
 
-    with t_col3:
-        st.markdown(f"Sum of probabilities: {np.sum(probs):.12f}")
+        with t_col3:
+            st.markdown(f"Sum of probabilities: {np.sum(probs):.12f}")
 
 
-    alive_sum = np.sum([p for i, p in enumerate(probs) if not valid_nodes[i].is_dead]) # Probability of faultless operation
-    dead_sum = np.sum([p for i, p in enumerate(probs) if valid_nodes[i].is_dead])
+        alive_sum = np.sum([p for i, p in enumerate(probs) if not valid_nodes[i].is_dead]) # Probability of faultless operation
+        dead_sum = np.sum([p for i, p in enumerate(probs) if valid_nodes[i].is_dead])
 
-    alive_count = sum(1 for node in valid_nodes if not node.is_dead)
-    dead_count = sum(1 for node in valid_nodes if node.is_dead)
-    st.write(f"Working states: {alive_count} / Failed states: {dead_count}")
+        alive_count = sum(1 for node in valid_nodes if not node.is_dead)
+        dead_count = sum(1 for node in valid_nodes if node.is_dead)
+        st.write(f"Working states: {alive_count} / Failed states: {dead_count}")
 
-    with t_col4:
-        st.write(f"Probability of faultless operation: {alive_sum:.12f} / `{alive_sum:.2%}`")
-    
-    with t_col5:
-        st.markdown(f"Probability of failure: {dead_sum:.12f} / `{dead_sum:.2%}`")
-
-    p_col_1, p_col_2 = st.columns([1, 3])
-
-    with p_col_1:
+        with t_col4:
+            st.write(f"Probability of faultless operation: {alive_sum:.12f} / `{alive_sum:.2%}`")
         
-        prob_table = []
-        dead_mask = []
+        with t_col5:
+            st.markdown(f"Probability of failure: {dead_sum:.12f} / `{dead_sum:.2%}`")
 
-        for i, p in enumerate(probs):
-            prob_table.append({
-                "idx": f"P{valid_nodes[i].idx}(t)",
-                "num": f"{valid_nodes[i].num}",
-                "Probability": f"{p:.12f}",
-                "%" : f"{p:.2%}"
-            })
-            dead_mask.append(valid_nodes[i].is_dead)
+        p_col_1, p_col_2 = st.columns([1, 3])
 
-        df = pd.DataFrame(prob_table)
+        with p_col_1:
+            
+            prob_table = []
+            dead_mask = []
 
-        def highlight_row(row):
-            if dead_mask[row.name]:
-                return ['background-color: #651d1d; color: white' for _ in row.index]
-            else:
-                return ['background-color: #334f65; color: white' for _ in row.index]
+            for i, p in enumerate(probs):
+                prob_table.append({
+                    "idx": f"P{valid_nodes[i].idx}(t)",
+                    "num": f"{valid_nodes[i].num}",
+                    "Probability": f"{p:.12f}",
+                    "%" : f"{p:.2%}"
+                })
+                dead_mask.append(valid_nodes[i].is_dead)
 
-        st.dataframe(df.style.apply(highlight_row, axis=1), hide_index=True, height=475)
-        
+            df = pd.DataFrame(prob_table)
+
+            def highlight_row(row):
+                if dead_mask[row.name]:
+                    return ['background-color: #651d1d; color: white' for _ in row.index]
+                else:
+                    return ['background-color: #334f65; color: white' for _ in row.index]
+
+            st.dataframe(df.style.apply(highlight_row, axis=1), hide_index=True, height=475)
+            
 
 
-    with p_col_2:
-        # Prepare data for bar chart
-        bar_colors = ['#83c9ff' if not valid_nodes[i].is_dead else '#ff4b4b' for i in range(len(probs))]
-        # bar_names = [f"P{valid_nodes[i].idx}" for i in range(len(probs))]
-        bar_names = [f"P{valid_nodes[i].num}" for i in range(len(probs))]
+        with p_col_2:
+            # Prepare data for bar chart
+            bar_colors = ['#83c9ff' if not valid_nodes[i].is_dead else '#ff4b4b' for i in range(len(probs))]
+            # bar_names = [f"P{valid_nodes[i].idx}" for i in range(len(probs))]
+            bar_names = [f"P{valid_nodes[i].num}" for i in range(len(probs))]
 
-        fig_bar = go.Figure()
-        fig_bar.add_trace(go.Bar(
-            x=bar_names,
-            y=probs,
-            marker_color=bar_colors
-        ))
-        fig_bar.update_layout(
-            title="State probability distribution (blue — working, red — failed)",
-            xaxis_title="State",
-            yaxis_title="Probability",
-            height=475,
-            margin=dict(l=0, r=0, t=25, b=0),
-            dragmode=False,
-            # dragmode='pan',
-            # xaxis=dict(tickangle=-90, tickfont=dict(size=10))
-        )
+            fig_bar = go.Figure()
+            fig_bar.add_trace(go.Bar(
+                x=bar_names,
+                y=probs,
+                marker_color=bar_colors
+            ))
+            fig_bar.update_layout(
+                title="State probability distribution (blue — working, red — failed)",
+                xaxis_title="State",
+                yaxis_title="Probability",
+                height=475,
+                margin=dict(l=0, r=0, t=25, b=0),
+                dragmode=False,
+                # dragmode='pan',
+                # xaxis=dict(tickangle=-90, tickfont=dict(size=10))
+            )
 
-        st.plotly_chart(fig_bar, 
-                        use_container_width=True,
-                        config={"scrollZoom": False, 
-                                "displayModeBar": True})
+            st.plotly_chart(fig_bar, 
+                            use_container_width=True,
+                            config={"scrollZoom": False, 
+                                    "displayModeBar": True})
 
 
 time_stats['state_probs_chart'] = time.time() - state_probs_chart_start_time
@@ -854,7 +866,7 @@ time_stats['state_probs_chart'] = time.time() - state_probs_chart_start_time
 
 
 # MARK: draw graph
-with st.expander(f"Draw Graph", expanded=True):
+with tab_graph:
     if st.button("Generate and Draw Graph"):
         with st.spinner("Wait for it...", show_time=True):
 
@@ -864,15 +876,15 @@ with st.expander(f"Draw Graph", expanded=True):
             t0_graph = time.time()
             img_graph = draw_graph(valid_nodes)
             time_stats['draw_graph'] = time.time() - t0_graph
-            with st.expander("Graph of Valid Nodes", expanded=True):
-                st.image(img_graph, caption="Graph of Valid Nodes", width="stretch")
+            # with st.expander("Graph of Valid Nodes", expanded=True):
+            #     st.image(img_graph, caption="Graph of Valid Nodes", width="stretch")
 
             # Timing for drawing all nodes
             t0_all = time.time()
             img_all = draw_nodes(all_nodes)
             time_stats['draw_all_nodes'] = time.time() - t0_all
-            with st.expander("All Generated Nodes", expanded=True):
-                st.image(img_all, caption="All Generated Nodes", width="stretch")
+            # with st.expander("All Generated Nodes", expanded=True):
+            #     st.image(img_all, caption="All Generated Nodes", width="stretch")
 
             t0_save_images = time.time()
             img_graph.save("images/graph.png")
@@ -885,10 +897,10 @@ with st.expander(f"Draw Graph", expanded=True):
             # img_all.show()
 
             # # Save at half size
-            # img_graph_2x = img_graph.resize((img_graph.width // 2, img_graph.height // 2), Image.LANCZOS)
-            # img_graph_2x.save("graph_2x.png")
-            # img_all_2x = img_all.resize((img_all.width // 2, img_all.height // 2), Image.LANCZOS)
-            # img_all_2x.save("all_nodes_2x.png")
+            img_graph_2x = img_graph.resize((img_graph.width // 2, img_graph.height // 2), Image.LANCZOS)
+            img_graph_2x.save("images/graph_2x.png")
+            img_all_2x = img_all.resize((img_all.width // 2, img_all.height // 2), Image.LANCZOS)
+            img_all_2x.save("images/all_nodes_2x.png")
 
 
 

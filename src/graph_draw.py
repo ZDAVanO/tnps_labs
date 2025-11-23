@@ -86,7 +86,7 @@ def draw_node(draw, node, x, y, radius, font_large, font_medium, font, ellipse_w
 
         mark_x = "x" if bid in node.locked_blocks else ""
         if block_type and not (isinstance(bid, int) or (isinstance(bid, float) and bid.is_integer())):
-            state_texts.append(f"{int(bid) if bid == int(bid) else int(bid)}.{block_type} - {state} {mark_x}")
+            state_texts.append(f"{int(bid) if bid == int(bid) else int(bid)}.{block_type} : {state} {mark_x}")
         else:
             state_texts.append(f"{int(bid)}   : {state} {mark_x}")
     for idx, line in enumerate(state_texts):
