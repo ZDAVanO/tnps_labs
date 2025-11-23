@@ -113,6 +113,10 @@ class GraphNode:
         self.outputs.append(other_block.idx)
         other_block.inputs.append(self.idx)
 
+    def connect_repair_to(self, other_block):
+        self.repair_outputs.append(other_block.idx)
+        other_block.repair_inputs.append(self.idx)
+
     def print_states_lines(self):
         lines = []
         lines.append(f"Node (idx={self.idx}, num={self.num}, row={self.row}, parent={self.node_parent}):")

@@ -219,6 +219,15 @@ def draw_graph(nodes):
             x1c, y1c = get_node_center(*node_pos[out_num], node_rows, max_cols, radius, row_margin, col_margin)
             draw_arrow(draw, x0c, y0c, x1c, y1c, radius, color=color, width=arrow_width, arrow_size=arrow_size)
             arrow_idx += 1
+        
+        for out_num in node.repair_outputs:
+            # print(f"GRAPH Drawing repair arrow {arrow_idx+1} (from node {node.idx} to {out_num})")
+            color = arrow_colors[arrow_idx % len(arrow_colors)]
+
+            x0c, y0c = get_node_center(*node_pos[node.idx], node_rows, max_cols, radius, row_margin, col_margin)
+            x1c, y1c = get_node_center(*node_pos[out_num], node_rows, max_cols, radius, row_margin, col_margin)
+            draw_arrow(draw, x0c, y0c, x1c, y1c, radius, color=color, width=arrow_width, arrow_size=arrow_size)
+            arrow_idx += 1
     
     return img_graph
 

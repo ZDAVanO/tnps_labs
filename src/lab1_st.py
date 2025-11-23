@@ -366,7 +366,10 @@ def generate_graph():
             if duplicate_idx is not None:
                 # --- CASE 1: DUPLICATE ---
                 if parent_idx in node_by_idx and duplicate_idx in node_by_idx:
-                    node_by_idx[parent_idx].connect_to(node_by_idx[duplicate_idx])
+                    if action_type == "repair":
+                        node_by_idx[parent_idx].connect_repair_to(node_by_idx[duplicate_idx])
+                    else:
+                        node_by_idx[parent_idx].connect_to(node_by_idx[duplicate_idx])
                     node.mark_duplicate_of(node_by_idx[duplicate_idx])
                 
                 output_lines.append(f"Node {idx}: is Duplicate of {duplicate_idx}")
@@ -381,7 +384,10 @@ def generate_graph():
                 
                 # Connect parent to this new node
                 if parent_idx in node_by_idx:
-                    node_by_idx[parent_idx].connect_to(node)
+                    if action_type == "repair":
+                        node_by_idx[parent_idx].connect_repair_to(node)
+                    else:
+                        node_by_idx[parent_idx].connect_to(node)
                 
                 # If system is still working, continue exploring (add to queue)
                 # if can_reach_result:
