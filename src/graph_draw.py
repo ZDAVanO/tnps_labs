@@ -1,6 +1,6 @@
 
 from PIL import Image, ImageDraw, ImageFont
-from math import atan2, cos, sin
+from math import atan2, cos, sin, sqrt
 
 
 # MARK: Configurations
@@ -13,7 +13,7 @@ row_margin = int( 850 )
 col_margin = int( 500 )
 
 arrow_width = int( 5 )
-arrow_size = int( 30 )
+arrow_size = int( 40 )
 
 mono_font = ImageFont.truetype("CascadiaMono.ttf", 32)
 mono_font_medium = ImageFont.truetype("CascadiaMono.ttf", 72)
@@ -64,7 +64,7 @@ def draw_node(draw, node, x, y, radius, font_large, font_medium, font, ellipse_w
     
         # write "д: {idx}" under the node number
         dup_num = node.duplicate_of[0] if isinstance(node.duplicate_of, list) else node.duplicate_of
-        dup_text = f"д: {dup_num}"
+        dup_text = f"D: {dup_num}"
         draw.text((x, y+70), dup_text, fill=(255,131,131), anchor='mm', font=font)
     else:
         draw.text((x, y-80), f"{node.num}", fill=(104, 160, 204), anchor='mm', font=font_medium)
@@ -77,11 +77,18 @@ def draw_node(draw, node, x, y, radius, font_large, font_medium, font, ellipse_w
     for bid in sorted(node.block_states):
         block_type = node.block_types[bid]
         state = node.block_states[bid]
+        if state == -1:
+            state = "0"
+        if state == -2:
+            state = "0*"
+        if state == 2:
+            state = "1*"
+
         mark_x = "x" if bid in node.locked_blocks else ""
         if block_type and not (isinstance(bid, int) or (isinstance(bid, float) and bid.is_integer())):
             state_texts.append(f"{int(bid) if bid == int(bid) else int(bid)}.{block_type} - {state} {mark_x}")
         else:
-            state_texts.append(f"{int(bid)}   - {state} {mark_x}")
+            state_texts.append(f"{int(bid)}   : {state} {mark_x}")
     for idx, line in enumerate(state_texts):
         draw.text((x+radius+30, y-radius+idx*text_row_height), line, fill=text_color, font=font)
 
@@ -99,26 +106,78 @@ def draw_graph(nodes):
         y = row_margin + row_idx * (2*radius + row_margin) + radius
         return (x, y)
 
-    def draw_arrow(draw, x0c, y0c, x1c, y1c, radius, color=(255,255,0,255), width=5, arrow_size=60, label=None, label_font=None):
-        angle = atan2(y1c-y0c, x1c-x0c)
+    def draw_arrow(draw, x0c, y0c, x1c, y1c, radius, color=(255,255,0,255), width=5, arrow_size=60, label=None, label_font=None, curve_height=75):
+        if curve_height == 0:
+            angle = atan2(y1c-y0c, x1c-x0c)
 
-        x0 = x0c + radius * cos(angle)
-        y0 = y0c + radius * sin(angle)
-        x1 = x1c - radius * cos(angle)
-        y1 = y1c - radius * sin(angle)
-        draw.line((x0, y0, x1, y1), fill=color, width=width)
+            x0 = x0c + radius * cos(angle)
+            y0 = y0c + radius * sin(angle)
+            x1 = x1c - radius * cos(angle)
+            y1 = y1c - radius * sin(angle)
+            draw.line((x0, y0, x1, y1), fill=color, width=width)
 
-        ax = x1 - arrow_size * cos(angle - 0.3)
-        ay = y1 - arrow_size * sin(angle - 0.3)
-        bx = x1 - arrow_size * cos(angle + 0.3)
-        by = y1 - arrow_size * sin(angle + 0.3)
-        draw.line((x1, y1, ax, ay), fill=color, width=width)
-        draw.line((x1, y1, bx, by), fill=color, width=width)
+            ax = x1 - arrow_size * cos(angle - 0.3)
+            ay = y1 - arrow_size * sin(angle - 0.3)
+            bx = x1 - arrow_size * cos(angle + 0.3)
+            by = y1 - arrow_size * sin(angle + 0.3)
+            draw.line((x1, y1, ax, ay), fill=color, width=width)
+            draw.line((x1, y1, bx, by), fill=color, width=width)
 
-        if label:
-            mx = (x0c + x1c) / 2
-            my = (y0c + y1c) / 2
-            draw.text((mx, my), label, fill=(255,255,255,255), anchor='mm', font=label_font)
+            if label:
+                mx = (x0c + x1c) / 2
+                my = (y0c + y1c) / 2
+                draw.text((mx, my), label, fill=(255,255,255,255), anchor='mm', font=label_font)
+        else:
+            # Calculate control point for quadratic Bezier
+            mx, my = (x0c + x1c) / 2, (y0c + y1c) / 2
+            dx, dy = x1c - x0c, y1c - y0c
+            dist = sqrt(dx*dx + dy*dy)
+            
+            if dist == 0:
+                nx, ny = 0, 0
+            else:
+                nx, ny = -dy / dist, dx / dist
+            
+            cx = mx + nx * curve_height
+            cy = my + ny * curve_height
+
+            # Calculate start and end points on the node circles
+            # Start point: intersection of center0->control with circle0
+            angle_start = atan2(cy - y0c, cx - x0c)
+            x0 = x0c + radius * cos(angle_start)
+            y0 = y0c + radius * sin(angle_start)
+
+            # End point: intersection of control->center1 with circle1
+            angle_end = atan2(y1c - cy, x1c - cx)
+            x1 = x1c - radius * cos(angle_end)
+            y1 = y1c - radius * sin(angle_end)
+
+            # Draw Bezier curve
+            points = []
+            steps = 30
+            for i in range(steps + 1):
+                t = i / steps
+                # Quadratic Bezier: (1-t)^2 P0 + 2(1-t)t P1 + t^2 P2
+                px = (1-t)**2 * x0 + 2*(1-t)*t * cx + t**2 * x1
+                py = (1-t)**2 * y0 + 2*(1-t)*t * cy + t**2 * y1
+                points.append((px, py))
+            
+            draw.line(points, fill=color, width=width)
+
+            # Arrowhead
+            ax = x1 - arrow_size * cos(angle_end - 0.3)
+            ay = y1 - arrow_size * sin(angle_end - 0.3)
+            bx = x1 - arrow_size * cos(angle_end + 0.3)
+            by = y1 - arrow_size * sin(angle_end + 0.3)
+            draw.line((x1, y1, ax, ay), fill=color, width=width)
+            draw.line((x1, y1, bx, by), fill=color, width=width)
+
+            if label:
+                # Label at t=0.5
+                t = 0.5
+                lx = (1-t)**2 * x0 + 2*(1-t)*t * cx + t**2 * x1
+                ly = (1-t)**2 * y0 + 2*(1-t)*t * cy + t**2 * y1
+                draw.text((lx, ly), label, fill=(255,255,255,255), anchor='mm', font=label_font)
 
 
     node_rows = {}

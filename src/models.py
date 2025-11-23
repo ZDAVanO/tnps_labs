@@ -29,7 +29,7 @@ class LogicBlock:
         self.state = new_state
 
     def is_working(self):
-        return self.state == 1
+        return self.state > 0
 
 
 

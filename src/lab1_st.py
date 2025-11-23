@@ -183,6 +183,8 @@ def generate_graph():
     block_mus = {bid: blocks[bid].mu for bid in block_ids}
     # total_blocks = len(block_ids)
 
+    block_repair_types = {bid: blocks[bid].type for bid in block_ids}
+
     output_lines = []  # for streamlit
 
     # Start node: all blocks are working
@@ -221,10 +223,34 @@ def generate_graph():
 
         # --- 0. Перевірка: чи працює система в ПОТОЧНОМУ стані? ---
         # Нам це треба знати, щоб вирішити, чи можна ламати далі.
-        current_broken_ids = [bid for bid, state in current_states.items() if state == 0]
+        current_broken_ids = [bid for bid, state in current_states.items() if state == 0 or state < 0]
         is_current_system_alive = can_reach(blocks, 0, max(blocks.keys()), current_broken_ids)
 
+        # ==========================================
+        # НОВА ЛОГІКА: ПЕРЕВІРКА НА "ВІЧНУ СМЕРТЬ"
+        # ==========================================
+        if not is_current_system_alive:
+            # 1. Знаходимо блоки, які вже НЕМОЖЛИВО полагодити (досягли ліміту версій)
+            irreparable_broken_ids = []
+            for bid in current_broken_ids:
+                val = current_states[bid]
+                rtype = block_types.get(bid, 'S')
+                # Якщо S-тип і стан -2 (або менше), ремонт неможливий
+                if rtype == 'S' and abs(val) >= 2:
+                    irreparable_broken_ids.append(bid)
+            
+            # 2. Перевіряємо: якщо ми полагодимо ВСЕ, крім вічно зламаних, чи запрацює система?
+            # Тобто, чи є irreparable_broken_ids критичним набором?
+            can_ever_recover = can_reach(blocks, 0, max(blocks.keys()), irreparable_broken_ids)
 
+            # 3. Якщо надії немає — зупиняємо цю гілку.
+            if not can_ever_recover:
+                output_lines.append(f"Node {idx}: System is PERMANENTLY DEAD (Unrecoverable). Stopping branch.")
+                output_lines.append("-" * 30)
+                # Важливо: ми не додаємо нічого в queue і переходимо до наступної ноди в черзі
+                continue 
+        # ==========================================
+        
 
         # --- 1. Збираємо всі можливі переходи (Transitions) ---
         transitions = [] # Список кортежів: (block_id, new_state_value, action_type)
@@ -232,7 +258,10 @@ def generate_graph():
         if is_current_system_alive:  # <--- ДОДАНО ЦЮ УМОВУ
         # Failure transitions
         # Перевірка: якщо блок у парі виключення вже зламаний, другий не можна ламати.
-            working_blocks = [bid for bid, state in current_states.items() if state == 1]
+            # working_blocks = [bid for bid, state in current_states.items() if state == 1]
+            # Шукаємо блоки, які зараз працюють (val > 0)
+            working_blocks = [bid for bid, val in current_states.items() if val > 0]
+
         # filtered_blocks = []
 
             # До створення нового вузла.
@@ -246,10 +275,20 @@ def generate_graph():
                 )
                 if not is_blocked:
                     # filtered_blocks.append(bid)
-                    transitions.append((bid, 0, "fail"))
+
+                    current_val = current_states[bid]
+                    rtype = block_types.get(bid, 'S')
+
+                    if rtype == 'H':
+                        new_val = 0 # Стандартний злам
+                    else: # rtype == 'S'
+                        new_val = -1 * current_val # 1 -> -1, 2 -> -2 (зберігаємо історію)
+
+                    # transitions.append((bid, 0, "fail"))
+                    transitions.append((bid, new_val, "fail"))
 
         # Б. ЛОГІКА РЕМОНТУ (0 -> 1)  <-- НОВИЙ ФУНКЦІОНАЛ
-        broken_blocks = [bid for bid, state in current_states.items() if state == 0]
+        broken_blocks = [bid for bid, state in current_states.items() if state == 0 or state < 0]
         for bid in broken_blocks:
             # Перевіряємо, чи дозволено ремонтувати
             # Не можна вмикати блок, якщо його партнер зараз ПРАЦЮЄ (1)
@@ -261,7 +300,25 @@ def generate_graph():
                     can_repair = False; break
             
             if can_repair:
-                transitions.append((bid, 1, "repair"))
+
+                current_val = current_states[bid]
+                rtype = block_types.get(bid, 'S')
+                new_val = None
+
+                if rtype == 'H':
+                    new_val = 1 # Завжди відновлюється в 1
+                elif rtype == 'S':
+                    # Логіка S: відновлюється лише 1 раз (тобто перехід 1 -> 2)
+                    # Якщо current_val == -1 (зламалась 1-ша версія), то ремонтуємо в 2
+                    # Якщо current_val == -2 (зламалась 2-га версія), ремонту більше немає
+                    version_broken = abs(current_val)
+                    if version_broken < 2: # Ліміт ремонтів (тут 1 ремонт, отже макс версія 2)
+                        new_val = version_broken + 1
+
+                if new_val is not None:
+                    # transitions.append((bid, 1, "repair"))
+                    transitions.append((bid, new_val, "repair"))
+
 
         # For each block that is not yet broken, create a new state with an additional failure
         # for broken_bid in filtered_blocks:
@@ -294,7 +351,8 @@ def generate_graph():
                 output_lines.append(line)
             output_lines.append(f"Action: {action_type.upper()} block {target_bid}")
 
-            broken_ids = [bid for bid, state in new_states.items() if state == 0] 
+            # broken_ids = [bid for bid, state in new_states.items() if state == 0] 
+            broken_ids = [bid for bid, state in new_states.items() if state == 0 or state < 0]
             # broken_ids - список зламаних блоків у новому стані
             can_reach_result = can_reach(blocks, 0, max(blocks.keys()), broken_ids)
             if not can_reach_result:
