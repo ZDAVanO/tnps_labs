@@ -8,7 +8,6 @@ from math import atan2, cos, sin
 import numpy as np
 import pandas as pd
 import plotly.graph_objs as go
-import streamlit as st
 from PIL import Image, ImageDraw, ImageFont
 from scipy.integrate import solve_ivp
 
@@ -876,15 +875,15 @@ with tab_graph:
             t0_graph = time.time()
             img_graph = draw_graph(valid_nodes)
             time_stats['draw_graph'] = time.time() - t0_graph
-            # with st.expander("Graph of Valid Nodes", expanded=True):
-            #     st.image(img_graph, caption="Graph of Valid Nodes", width="stretch")
+            with st.expander("Graph of Valid Nodes", expanded=True):
+                st.image(img_graph, caption="Graph of Valid Nodes", width="stretch")
 
             # Timing for drawing all nodes
             t0_all = time.time()
             img_all = draw_nodes(all_nodes)
             time_stats['draw_all_nodes'] = time.time() - t0_all
-            # with st.expander("All Generated Nodes", expanded=True):
-            #     st.image(img_all, caption="All Generated Nodes", width="stretch")
+            with st.expander("All Generated Nodes", expanded=True):
+                st.image(img_all, caption="All Generated Nodes", width="stretch")
 
             t0_save_images = time.time()
             img_graph.save("images/graph.png")

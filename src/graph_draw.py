@@ -1,4 +1,3 @@
-
 from PIL import Image, ImageDraw, ImageFont
 from math import atan2, cos, sin, sqrt
 
@@ -33,7 +32,7 @@ arrow_colors = [
 
 
 # MARK: draw_node()
-def draw_node(draw, node, x, y, radius, font_large, font_medium, font, ellipse_width, text_row_height):
+def draw_node(draw, node, x, y, radius, font_large, font_medium, font, ellipse_width, text_row_height, bg_color='black'):
 
     # Determine colors based on node state
     if node.is_dead:
@@ -41,10 +40,10 @@ def draw_node(draw, node, x, y, radius, font_large, font_medium, font, ellipse_w
         fill_color = (91, 44, 44)
     elif node.duplicate_of:
         circle_color = (255, 131, 131)
-        fill_color = 'black'
+        fill_color = bg_color
     else: # normal
         circle_color = 'white'
-        fill_color = 'black'
+        fill_color = bg_color
     
     text_color = circle_color if not node.is_dead else 'white'
 
@@ -95,7 +94,8 @@ def draw_node(draw, node, x, y, radius, font_large, font_medium, font, ellipse_w
 
 
 # MARK: draw_graph()
-def draw_graph(nodes):
+# def draw_graph(nodes, bg_color='black'):
+def draw_graph(nodes, bg_color=(14, 17, 23)):
 
     def get_node_center(row_idx, col_idx, node_rows, max_cols, radius, row_margin, col_margin):
         row_nodes = len(node_rows[row_idx+1])
@@ -191,7 +191,7 @@ def draw_graph(nodes):
     width = max_cols * (2*radius + col_margin) + col_margin
     height = rows_count * (2*radius + row_margin) + row_margin
 
-    img_graph = Image.new('RGB', (width, height), 'black')
+    img_graph = Image.new('RGB', (width, height), bg_color)
     draw = ImageDraw.Draw(img_graph, 'RGBA')
 
 
@@ -205,7 +205,7 @@ def draw_graph(nodes):
     for idx, node in enumerate(nodes, 1):
         # print(f"GRAPH Drawing node {idx}/{len(valid_nodes)}")
         x, y = get_node_center(*node_pos[node.idx], node_rows, max_cols, radius, row_margin, col_margin)
-        draw_node(draw, node, x, y, radius, mono_font_large, mono_font_medium, mono_font, ellipse_width, text_row_height)
+        draw_node(draw, node, x, y, radius, mono_font_large, mono_font_medium, mono_font, ellipse_width, text_row_height, bg_color=bg_color)
 
     # Draw arrows for outputs, cycling colors
     # total_arrows = sum(len(node.outputs) for node in valid_nodes)
@@ -234,7 +234,8 @@ def draw_graph(nodes):
 
 
 # MARK: draw_nodes()
-def draw_nodes(nodes):
+# def draw_nodes(nodes, bg_color='black'):
+def draw_nodes(nodes, bg_color=(14, 17, 23)):
 
     # Групуємо всі ноди по node_parent
     nodes_by_parent = {}
@@ -250,7 +251,7 @@ def draw_nodes(nodes):
     width_parents = max_row_len * col_width + 1000
     height_parents = len(parent_keys) * row_height + 200
 
-    img_all = Image.new('RGBA', (width_parents, height_parents), 'black')  # <-- RGBA mode for alpha support
+    img_all = Image.new('RGBA', (width_parents, height_parents), bg_color)
     draw_parents = ImageDraw.Draw(img_all, 'RGBA')
 
     for row_idx, parent_num in enumerate(parent_keys):
@@ -266,6 +267,6 @@ def draw_nodes(nodes):
         for col_idx, node in enumerate(nodes_row):
             x = 1000 + col_idx * col_width
             y = row_idx * row_height + radius + 50
-            draw_node(draw_parents, node, x, y, radius, mono_font_large, mono_font_medium, mono_font, ellipse_width, text_row_height)
+            draw_node(draw_parents, node, x, y, radius, mono_font_large, mono_font_medium, mono_font, ellipse_width, text_row_height, bg_color=bg_color)
             
     return img_all
