@@ -35,7 +35,10 @@ arrow_colors = [
 def draw_node(draw, node, x, y, radius, font_large, font_medium, font, ellipse_width, text_row_height, bg_color='black'):
 
     # Determine colors based on node state
-    if node.is_dead:
+    if node.is_permanently_dead:
+        circle_color = 'white'
+        fill_color = (160, 70, 0) 
+    elif node.is_dead:
         circle_color = 'white'
         fill_color = (91, 44, 44)
     elif node.duplicate_of:

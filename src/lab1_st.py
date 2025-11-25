@@ -85,7 +85,10 @@ with st.sidebar:
 
     scheme = s_m_col1.radio(
         "Select block scheme:",
-        options=["Full scheme", "Simple scheme"],
+        options=["Simple Example", 
+                 "Variant 5",
+                #  "Variant 4"
+                 ],
         index=0
     )
 
@@ -157,8 +160,31 @@ with st.sidebar:
 
 
 # MARK: Blocks
-# MARK: Blocks
-if scheme == "Full scheme":
+
+if scheme == "Simple Example":
+    blocks = {
+        0:    LogicBlock(0, "Start"),
+
+        1:  LogicBlock(1, "S", lam=lam_b1_h, mu=mu_b1_h),
+        2:  LogicBlock(2, "H", lam=lam_b1_s, mu=mu_b1_s),
+        3:  LogicBlock(3, "H", lam=lam_b2, mu=mu_b2),
+
+        4:  LogicBlock(4, "End"),
+    }
+
+    # dependencies of blocks that cannot be simultaneously working/faulty
+    mutual_exclusions = []
+
+    blocks[0].connect_to(blocks[1])
+
+
+    blocks[1].connect_to(blocks[2])
+    blocks[1].connect_to(blocks[3])
+
+    blocks[2].connect_to(blocks[4])
+    blocks[3].connect_to(blocks[4])
+
+elif scheme == "Variant 5":
     blocks = {
         0:    LogicBlock(0, "Start"),
 
@@ -198,31 +224,41 @@ if scheme == "Full scheme":
     blocks[4].connect_to(blocks[6])
     blocks[5.2].connect_to(blocks[6])
 
-else:
+elif scheme == "Variant 4":
     blocks = {
-        0:    LogicBlock(0, "Start"),
+        0:      LogicBlock(0, "Start"),
 
-        1:  LogicBlock(1, "S", lam=lam_b1_h, mu=mu_b1_h),
-        2:  LogicBlock(2, "H", lam=lam_b1_s, mu=mu_b1_s),
-        3:  LogicBlock(3, "H", lam=lam_b2, mu=mu_b2),
+        1.1:    LogicBlock(1.1, "H", lam=lam_b1_h, mu=mu_b1_h),
+        1.2:    LogicBlock(1.2, "S", lam=lam_b1_s, mu=mu_b1_s),
+        2:      LogicBlock(2, "H", lam=lam_b2, mu=mu_b2),
+        3.1:    LogicBlock(3.1, "H", lam=lam_b3, mu=mu_b3),
+        3.2:    LogicBlock(3.2, "S", lam=lam_b4, mu=mu_b4),
+        4:      LogicBlock(4, "H", lam=lam_b5_h, mu=mu_b5_h),
+        5:      LogicBlock(5, "H", lam=lam_b5_s, mu=mu_b5_s),
 
-        4:  LogicBlock(4, "End"),
+        6:      LogicBlock(6, "End"),
     }
+    mutual_exclusions = [
+        (1.1, 1.2),
+        (3.1, 3.2)
+    ]
 
-    # dependencies of blocks that cannot be simultaneously working/faulty
-    mutual_exclusions = []
+    # Зв'язки згідно з малюнком
+    blocks[0].connect_to(blocks[1.1])
+    blocks[0].connect_to(blocks[3.1])
 
-    blocks[0].connect_to(blocks[1])
+    blocks[1.1].connect_to(blocks[1.2])
+    blocks[3.1].connect_to(blocks[3.2])
 
-
-    blocks[1].connect_to(blocks[2])
-    blocks[1].connect_to(blocks[3])
+    blocks[1.2].connect_to(blocks[2])
 
     blocks[2].connect_to(blocks[4])
-    blocks[3].connect_to(blocks[4])
+    blocks[2].connect_to(blocks[5])
+    blocks[3.2].connect_to(blocks[4])
+    blocks[3.2].connect_to(blocks[5])
 
-
-
+    blocks[4].connect_to(blocks[6])
+    blocks[5].connect_to(blocks[6])
 
 
 # MARK: generate_graph()
@@ -460,7 +496,7 @@ failed_nodes = [node for node in valid_nodes if node.is_dead and not node.is_per
 # Вузли у "вічній смерті"
 perma_dead_nodes = [node for node in valid_nodes if node.is_permanently_dead]
 
-st.markdown(f"##### `Generated (All): {len(all_nodes)}` `Valid: {len(valid_nodes)}` `Working: {len(working_nodes)}` `Failed: {len(failed_nodes)}` `Permanent Death: {len(perma_dead_nodes)}`")
+st.markdown(f"##### `Generated (All): {len(all_nodes)}` `Valid: {len(valid_nodes)}` `Working: {len(working_nodes)}` `Failed: {len(failed_nodes)}` `Permanent Fail: {len(perma_dead_nodes)}`")
 
 # Output via streamlit
 tab_gen_conn, tab_eq, tab_charts, tab_graph = st.tabs([
@@ -786,6 +822,9 @@ alive_probs_sum = np.sum(sol.y[alive_mask, :], axis=0)  # shape: (len(sol.t),)
 alive_probs_sum = np.round(alive_probs_sum, 6)  # Add rounding
 # st.write(alive_probs_sum)
 # st.text(len(alive_probs_sum))
+
+# K_g = alive_probs_sum[-1]  # Стаціонарний коефіцієнт готовності
+# st.write(f"Стаціонарний коефіцієнт готовності: {K_g:.6f}")
 
 fig_alive = go.Figure()
 fig_alive.add_trace(go.Scatter(
