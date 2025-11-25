@@ -104,7 +104,7 @@ class GraphNode:
         self.locked_blocks = []
 
         self.is_dead = False
-        self.fixable = True
+        self.is_permanently_dead = False
 
     def mark_duplicate_of(self, other_node):
         self.duplicate_of.append(other_node.idx)

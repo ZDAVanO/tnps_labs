@@ -80,101 +80,153 @@ start_time = time.time()
 
 # MARK: Sidebar
 with st.sidebar:
-    # st.header("Integration Parameters")
-    integration_time = st.slider(
-        "Integration time (t, sec)", 
-        min_value=100, max_value=15000, value=2500, step=100
+
+    s_m_col1, s_m_col2 = st.columns(2)
+
+    scheme = s_m_col1.radio(
+        "Select block scheme:",
+        options=["Full scheme", "Simple scheme"],
+        index=0
     )
+
+    enable_repair = s_m_col2.toggle("Enable repair", value=False)
+
+
+    with st.container(border=True):
+        # st.subheader("Integration Settings")
+
+        integration_time = st.slider(
+            "Integration time (t, sec)", 
+            min_value=100, max_value=15000, value=2500, step=100
+        )
+
+        n_points = st.number_input(
+            "Number of integration points (t_eval)", 
+            min_value=100, max_value=20000, value=1500, step=100
+        )
+
+        pr_col1, pr_col2 = st.columns(2)
+
+        rtol = pr_col1.number_input(
+            "Integrator relative tolerance (rtol)", 
+            min_value=1e-12, max_value=1e-3, value=1e-9, format="%.1e", disabled=True
+        )
+
+        atol = pr_col2.number_input(
+            "Integrator absolute tolerance (atol)", 
+            min_value=1e-15, max_value=1e-6, value=1e-12, format="%.1e", disabled=True
+        )
+
+    with st.expander("Block values", expanded=True):
+        input_col1, input_col2 = st.columns(2)
 
     lam_min_value = 0.0
     lam_max_value = 0.1
     lam_format_str = "%.5f"
     lam_step = 0.0001
 
-    st.write("λ values for blocks:")
 
-    lam_b1_h = round(st.number_input("b1_h (1.1)", min_value=lam_min_value, max_value=lam_max_value, value=0.0005, format=lam_format_str, step=lam_step), 6)
-    lam_b1_s = round(st.number_input("b1_s (1.2)", min_value=lam_min_value, max_value=lam_max_value, value=0.0005, format=lam_format_str, step=lam_step), 6)
-    lam_b2   = round(st.number_input("b2 (2)",     min_value=lam_min_value, max_value=lam_max_value, value=0.0004, format=lam_format_str, step=lam_step), 6)
-    lam_b3   = round(st.number_input("b3 (3)",     min_value=lam_min_value, max_value=lam_max_value, value=0.0003, format=lam_format_str, step=lam_step), 6)
-    lam_b4   = round(st.number_input("b4 (4)",     min_value=lam_min_value, max_value=lam_max_value, value=0.00025, format=lam_format_str, step=lam_step), 6)
-    lam_b5_h = round(st.number_input("b5_h (5.1)", min_value=lam_min_value, max_value=lam_max_value, value=0.0005, format=lam_format_str, step=lam_step), 6)
-    lam_b5_s = round(st.number_input("b5_s (5.2)", min_value=lam_min_value, max_value=lam_max_value, value=0.0001, format=lam_format_str, step=lam_step), 6)
+    with input_col1:
+        # st.write("λ values for blocks:")
 
+        lam_b1_h = round(st.number_input("λ b1_h (1.1)", min_value=lam_min_value, max_value=lam_max_value, value=0.0005, format=lam_format_str, step=lam_step), 6)
+        lam_b1_s = round(st.number_input("λ b1_s (1.2)", min_value=lam_min_value, max_value=lam_max_value, value=0.0005, format=lam_format_str, step=lam_step), 6)
+        lam_b2   = round(st.number_input("λ b2 (2)",     min_value=lam_min_value, max_value=lam_max_value, value=0.0004, format=lam_format_str, step=lam_step), 6)
+        lam_b3   = round(st.number_input("λ b3 (3)",     min_value=lam_min_value, max_value=lam_max_value, value=0.0003, format=lam_format_str, step=lam_step), 6)
+        lam_b4   = round(st.number_input("λ b4 (4)",     min_value=lam_min_value, max_value=lam_max_value, value=0.00025, format=lam_format_str, step=lam_step), 6)
+        lam_b5_h = round(st.number_input("λ b5_h (5.1)", min_value=lam_min_value, max_value=lam_max_value, value=0.0005, format=lam_format_str, step=lam_step), 6)
+        lam_b5_s = round(st.number_input("λ b5_s (5.2)", min_value=lam_min_value, max_value=lam_max_value, value=0.0001, format=lam_format_str, step=lam_step), 6)
+
+    with input_col2:
+        # st.write("μ values for blocks:")
+
+        mu_min_value = 0.0
+        mu_max_value = 0.1
+        mu_format_str = "%.5f"
+        mu_step = 0.0001
+
+        mu_b1_h = round(st.number_input("μ b1_h (1.1)", min_value=mu_min_value, max_value=mu_max_value, value=0.005, format=mu_format_str, step=mu_step, disabled=not enable_repair), 6)
+        mu_b1_s = round(st.number_input("μ b1_s (1.2)", min_value=mu_min_value, max_value=mu_max_value, value=0.005, format=mu_format_str, step=mu_step, disabled=not enable_repair), 6)
+        mu_b2   = round(st.number_input("μ b2 (2)",     min_value=mu_min_value, max_value=mu_max_value, value=0.004, format=mu_format_str, step=mu_step, disabled=not enable_repair), 6)
+        mu_b3   = round(st.number_input("μ b3 (3)",     min_value=mu_min_value, max_value=mu_max_value, value=0.003, format=mu_format_str, step=mu_step, disabled=not enable_repair), 6)
+        mu_b4   = round(st.number_input("μ b4 (4)",     min_value=mu_min_value, max_value=mu_max_value, value=0.0025, format=mu_format_str, step=mu_step, disabled=not enable_repair), 6)
+        mu_b5_h = round(st.number_input("μ b5_h (5.1)", min_value=mu_min_value, max_value=mu_max_value, value=0.005, format=mu_format_str, step=mu_step, disabled=not enable_repair), 6)
+        mu_b5_s = round(st.number_input("μ b5_s (5.2)", min_value=mu_min_value, max_value=mu_max_value, value=0.001, format=mu_format_str, step=mu_step, disabled=not enable_repair), 6)
 
 
 
 
 # MARK: Blocks
-# blocks = {
-#     0:    LogicBlock(0, "Start"),
+# MARK: Blocks
+if scheme == "Full scheme":
+    blocks = {
+        0:    LogicBlock(0, "Start"),
 
-#     1.1:  LogicBlock(1.1, "H", lam=lam_b1_h),
-#     1.2:  LogicBlock(1.2, "S", lam=lam_b1_s),
+        1.1:  LogicBlock(1.1, "H", lam=lam_b1_h, mu=mu_b1_h),
+        1.2:  LogicBlock(1.2, "S", lam=lam_b1_s, mu=mu_b1_s),
 
-#     2:    LogicBlock(2, "H", lam=lam_b2),
-#     3:    LogicBlock(3, "H", lam=lam_b3),
-#     4:    LogicBlock(4, "H", lam=lam_b4),
+        2:    LogicBlock(2, "H", lam=lam_b2, mu=mu_b2),
+        3:    LogicBlock(3, "H", lam=lam_b3, mu=mu_b3),
+        4:    LogicBlock(4, "H", lam=lam_b4, mu=mu_b4),
 
-#     5.1:  LogicBlock(5.1, "H", lam=lam_b5_h),
-#     5.2:  LogicBlock(5.2, "S", lam=lam_b5_s),
+        5.1:  LogicBlock(5.1, "H", lam=lam_b5_h, mu=mu_b5_h),
+        5.2:  LogicBlock(5.2, "S", lam=lam_b5_s, mu=mu_b5_s),
 
-#     6:    LogicBlock(6, "End"),
-# }
+        6:    LogicBlock(6, "End"),
+    }
 
-# # dependencies of blocks that cannot be simultaneously working/faulty
-# mutual_exclusions = [
-#     (1.1, 1.2),
-#     (5.1, 5.2)
-# ]
+    # dependencies of blocks that cannot be simultaneously working/faulty
+    mutual_exclusions = [
+        (1.1, 1.2),
+        (5.1, 5.2)
+    ]
 
-# blocks[0].connect_to(blocks[1.1])
-# blocks[0].connect_to(blocks[2])
-# blocks[0].connect_to(blocks[5.1])
+    blocks[0].connect_to(blocks[1.1])
+    blocks[0].connect_to(blocks[2])
+    blocks[0].connect_to(blocks[5.1])
 
-# blocks[1.1].connect_to(blocks[1.2])
-# blocks[5.1].connect_to(blocks[5.2])
+    blocks[1.1].connect_to(blocks[1.2])
+    blocks[5.1].connect_to(blocks[5.2])
 
-# blocks[1.2].connect_to(blocks[3])
-# blocks[1.2].connect_to(blocks[4])
+    blocks[1.2].connect_to(blocks[3])
+    blocks[1.2].connect_to(blocks[4])
 
-# blocks[2].connect_to(blocks[3])
-# blocks[2].connect_to(blocks[4])
+    blocks[2].connect_to(blocks[3])
+    blocks[2].connect_to(blocks[4])
 
-# blocks[3].connect_to(blocks[6])
-# blocks[4].connect_to(blocks[6])
-# blocks[5.2].connect_to(blocks[6])
+    blocks[3].connect_to(blocks[6])
+    blocks[4].connect_to(blocks[6])
+    blocks[5.2].connect_to(blocks[6])
+
+else:
+    blocks = {
+        0:    LogicBlock(0, "Start"),
+
+        1:  LogicBlock(1, "S", lam=lam_b1_h, mu=mu_b1_h),
+        2:  LogicBlock(2, "H", lam=lam_b1_s, mu=mu_b1_s),
+        3:  LogicBlock(3, "H", lam=lam_b2, mu=mu_b2),
+
+        4:  LogicBlock(4, "End"),
+    }
+
+    # dependencies of blocks that cannot be simultaneously working/faulty
+    mutual_exclusions = []
+
+    blocks[0].connect_to(blocks[1])
 
 
+    blocks[1].connect_to(blocks[2])
+    blocks[1].connect_to(blocks[3])
 
-blocks = {
-    0:    LogicBlock(0, "Start"),
-
-    1:  LogicBlock(1, "S", lam=lam_b1_h),
-    2:  LogicBlock(2, "H", lam=lam_b1_s),
-    3:  LogicBlock(3, "H", lam=lam_b2),
-
-    4:  LogicBlock(4, "End"),
-}
-
-# dependencies of blocks that cannot be simultaneously working/faulty
-mutual_exclusions = []
-
-blocks[0].connect_to(blocks[1])
-
-
-blocks[1].connect_to(blocks[2])
-blocks[1].connect_to(blocks[3])
-
-blocks[2].connect_to(blocks[4])
-blocks[3].connect_to(blocks[4])
+    blocks[2].connect_to(blocks[4])
+    blocks[3].connect_to(blocks[4])
 
 
 
 
 
 # MARK: generate_graph()
-def generate_graph():
+def generate_graph(enable_repair=False):
     valid_node_num = 1
     block_ids = [b.id for b in blocks.values() if b.type not in ["Start", "End"]]
     block_types = {bid: blocks[bid].type for bid in block_ids}
@@ -247,6 +299,7 @@ def generate_graph():
                 output_lines.append(f"Node {idx}: System is PERMANENTLY DEAD (Unrecoverable). Stopping branch.")
                 output_lines.append("-" * 30)
                 # Важливо: ми не додаємо нічого в queue і переходимо до наступної ноди в черзі
+                current_node.is_permanently_dead = True
                 continue 
         # ==========================================
         
@@ -268,8 +321,8 @@ def generate_graph():
             for bid in working_blocks:
                 # Перевіряємо, чи є хоч одна умова, яка блокує цей bid
                 is_blocked = any(
-                    (bid == a and current_states.get(b, 1) == 0) or 
-                    (bid == b and current_states.get(a, 1) == 0)
+                    (bid == a and current_states.get(b, 1) <= 0) or 
+                    (bid == b and current_states.get(a, 1) <= 0)
                     for a, b in mutual_exclusions
                 )
                 if not is_blocked:
@@ -287,19 +340,9 @@ def generate_graph():
                     transitions.append((bid, new_val, "fail"))
 
         # Б. ЛОГІКА РЕМОНТУ (0 -> 1)  <-- НОВИЙ ФУНКЦІОНАЛ
-        broken_blocks = [bid for bid, state in current_states.items() if state == 0 or state < 0]
-        for bid in broken_blocks:
-            # Перевіряємо, чи дозволено ремонтувати
-            # Не можна вмикати блок, якщо його партнер зараз ПРАЦЮЄ (1)
-            can_repair = True
-            # for a, b in mutual_exclusions:
-            #     if bid == a and current_states.get(b, 1) == 1:
-            #         can_repair = False; break
-            #     if bid == b and current_states.get(a, 1) == 1:
-            #         can_repair = False; break
-            
-            if can_repair:
-
+        if enable_repair:
+            broken_blocks = [bid for bid, state in current_states.items() if state == 0 or state < 0]
+            for bid in broken_blocks:
                 current_val = current_states[bid]
                 rtype = block_types.get(bid, 'S')
                 new_val = None
@@ -331,9 +374,9 @@ def generate_graph():
             # "вішає ярлик" на блоки, які залишилися цілими.
             locked_blocks = []
             for a, b in mutual_exclusions:
-                if (new_states.get(a, 1) == 0) and (new_states.get(b, 1) == 1):
+                if (new_states.get(a, 1) <= 0) and (new_states.get(b, 1) > 0):
                     locked_blocks.append(b)
-                if (new_states.get(b, 1) == 0) and (new_states.get(a, 1) == 1):
+                if (new_states.get(b, 1) <= 0) and (new_states.get(a, 1) > 0):
                     locked_blocks.append(a)
 
 
@@ -406,17 +449,28 @@ def generate_graph():
     return valid_nodes, all_nodes, output_lines
 
 
-valid_nodes, all_nodes, output_lines = generate_graph()
+valid_nodes, all_nodes, output_lines = generate_graph(enable_repair=enable_repair)
 
-st.write(f"{len(all_nodes)} nodes generated / {len(valid_nodes)} valid.")
+
+
+# Робочі вузли
+working_nodes = [node for node in valid_nodes if not node.is_dead and not node.is_permanently_dead]
+# Поламані вузли (але не вічна смерть)
+failed_nodes = [node for node in valid_nodes if node.is_dead and not node.is_permanently_dead]
+# Вузли у "вічній смерті"
+perma_dead_nodes = [node for node in valid_nodes if node.is_permanently_dead]
+
+st.markdown(f"##### `Generated (All): {len(all_nodes)}` `Valid: {len(valid_nodes)}` `Working: {len(working_nodes)}` `Failed: {len(failed_nodes)}` `Permanent Death: {len(perma_dead_nodes)}`")
 
 # Output via streamlit
 tab_gen_conn, tab_eq, tab_charts, tab_graph = st.tabs([
     "Logs", 
     "Equations", 
     "Charts & Reliability", 
-    "Graph Visualization"
-])
+    "Graph Visualization" 
+    ], 
+    default="Charts & Reliability"
+)
 
 
 
@@ -647,14 +701,13 @@ def kolmogorov_rhs(t, P, nodes: List[GraphNode]):
     return dPdt
 
 # MARK: solve_kolmogorov
-def solve_kolmogorov(nodes, t_span, P0=None, t_eval=None):
+def solve_kolmogorov(nodes, t_span, P0=None, t_eval=None, rtol=1e-9, atol=1e-12):
     n = len(nodes)
     if P0 is None:
         P0 = np.zeros(n)
         P0[0] = 1.0  # Initial state: all probability in first node
     if t_eval is None:
-        t_eval = np.linspace(t_span[0], t_span[1], 1500)
-        # t_eval = np.linspace(t_span[0], t_span[1], t_span[1] + 1)
+        t_eval = np.linspace(t_span[0], t_span[1], n_points)
     sol = solve_ivp(
         fun=lambda t, P: kolmogorov_rhs(t, P, nodes),
         t_span=t_span,
@@ -662,8 +715,8 @@ def solve_kolmogorov(nodes, t_span, P0=None, t_eval=None):
         t_eval=t_eval,
         # method='RK45'
         # rtol=1e-7, atol=1e-9
-        rtol=1e-9, # Relative error of integrator
-        atol=1e-12 # Absolute error of integrator
+        # rtol=rtol, # Relative error of integrator
+        # atol=atol # Absolute error of integrator
     )
     return sol
 
@@ -671,7 +724,14 @@ def solve_kolmogorov(nodes, t_span, P0=None, t_eval=None):
 
 P0 = None
 ode_start_time = time.time()
-sol = solve_kolmogorov(valid_nodes, t_span=(0, integration_time), P0=P0)
+sol = solve_kolmogorov(
+    valid_nodes, 
+    t_span=(0, integration_time), 
+    P0=P0, 
+    t_eval=np.linspace(0, integration_time, n_points),
+    rtol=rtol,
+    atol=atol
+)
 time_stats['solve_kolmogorov'] = time.time() - ode_start_time
 
 
@@ -870,26 +930,38 @@ with tab_graph:
         with st.spinner("Wait for it...", show_time=True):
 
             os.makedirs("images/", exist_ok=True)
+            max_dim = 35000
 
             # Timing for drawing graph
             t0_graph = time.time()
             img_graph = draw_graph(valid_nodes)
             time_stats['draw_graph'] = time.time() - t0_graph
-            with st.expander("Graph of Valid Nodes", expanded=True):
-                st.image(img_graph, caption="Graph of Valid Nodes", width="stretch")
+
+            if img_graph.width > max_dim or img_graph.height > max_dim:
+                with st.expander("Graph of Valid Nodes", expanded=True):
+                    st.warning(f"Image too large to display ({img_graph.width}x{img_graph.height}).")
+            else:
+                with st.expander("Graph of Valid Nodes", expanded=True):
+                    st.image(img_graph, caption="Graph of Valid Nodes", width="stretch")
+                    
+            img_graph.save("images/graph.png")
 
             # Timing for drawing all nodes
             t0_all = time.time()
             img_all = draw_nodes(all_nodes)
             time_stats['draw_all_nodes'] = time.time() - t0_all
-            with st.expander("All Generated Nodes", expanded=True):
-                st.image(img_all, caption="All Generated Nodes", width="stretch")
+
+            if img_all.width > max_dim or img_all.height > max_dim:
+                with st.expander("All Generated Nodes", expanded=True):
+                    st.warning(f"Image too large to display ({img_all.width}x{img_all.height}).")
+            else:
+                with st.expander("All Generated Nodes", expanded=True):
+                    st.image(img_all, caption="All Generated Nodes", width="stretch")
+
+            img_all.save("images/all_nodes.png")
 
             t0_save_images = time.time()
-            img_graph.save("images/graph.png")
-            img_all.save("images/all_nodes.png")
             time_stats['save_images'] = time.time() - t0_save_images
-
             st.success("Images saved to disk.")
 
             # img_graph.show()
@@ -898,6 +970,7 @@ with tab_graph:
             # # Save at half size
             img_graph_2x = img_graph.resize((img_graph.width // 2, img_graph.height // 2), Image.LANCZOS)
             img_graph_2x.save("images/graph_2x.png")
+
             img_all_2x = img_all.resize((img_all.width // 2, img_all.height // 2), Image.LANCZOS)
             img_all_2x.save("images/all_nodes_2x.png")
 
@@ -907,15 +980,13 @@ with tab_graph:
 
 
 
-
-
 # MARK: Time stats
 with st.sidebar:
-    st.divider()
-    time_stats['total'] = time.time() - start_time
-    # display time stats
-    for key, val in time_stats.items():
-        st.write(f"**{key}**: {val:.2f} sec")
+    with st.expander("Time Statistics", expanded=True):
+        time_stats['total'] = time.time() - start_time
+        # display time stats
+        for key, val in time_stats.items():
+            st.write(f"**{key}**: {val:.2f} sec")
 
 
 
