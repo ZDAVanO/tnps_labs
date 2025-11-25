@@ -3,17 +3,16 @@ import streamlit as st
 import os
 import time
 from collections import deque
-from math import atan2, cos, sin
 
 import numpy as np
 import pandas as pd
 import plotly.graph_objs as go
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image
 from scipy.integrate import solve_ivp
 
 Image.MAX_IMAGE_PIXELS = None  # Disables "decompression bomb" check
 
-from graph_draw import draw_node, draw_graph, draw_nodes
+from graph_draw import draw_graph, draw_nodes
 from models import LogicBlock, can_reach, GraphNode
 
 from typing import List
@@ -130,7 +129,6 @@ with st.sidebar:
 
 
     with input_col1:
-        # st.write("λ values for blocks:")
 
         lam_b1_h = round(st.number_input("λ b1_h (1.1)", min_value=lam_min_value, max_value=lam_max_value, value=0.0005, format=lam_format_str, step=lam_step), 6)
         lam_b1_s = round(st.number_input("λ b1_s (1.2)", min_value=lam_min_value, max_value=lam_max_value, value=0.0005, format=lam_format_str, step=lam_step), 6)
@@ -141,7 +139,6 @@ with st.sidebar:
         lam_b5_s = round(st.number_input("λ b5_s (5.2)", min_value=lam_min_value, max_value=lam_max_value, value=0.0001, format=lam_format_str, step=lam_step), 6)
 
     with input_col2:
-        # st.write("μ values for blocks:")
 
         mu_min_value = 0.0
         mu_max_value = 0.1
@@ -160,7 +157,7 @@ with st.sidebar:
 
 
 # MARK: Blocks
-
+# MARK: Simple Example
 if scheme == "Simple Example":
     blocks = {
         0:    LogicBlock(0, "Start"),
@@ -177,13 +174,13 @@ if scheme == "Simple Example":
 
     blocks[0].connect_to(blocks[1])
 
-
     blocks[1].connect_to(blocks[2])
     blocks[1].connect_to(blocks[3])
 
     blocks[2].connect_to(blocks[4])
     blocks[3].connect_to(blocks[4])
 
+# MARK: Variant 5
 elif scheme == "Variant 5":
     blocks = {
         0:    LogicBlock(0, "Start"),
@@ -224,6 +221,7 @@ elif scheme == "Variant 5":
     blocks[4].connect_to(blocks[6])
     blocks[5.2].connect_to(blocks[6])
 
+# MARK: Variant 4
 elif scheme == "Variant 4":
     blocks = {
         0:      LogicBlock(0, "Start"),
@@ -238,12 +236,12 @@ elif scheme == "Variant 4":
 
         6:      LogicBlock(6, "End"),
     }
+
     mutual_exclusions = [
         (1.1, 1.2),
         (3.1, 3.2)
     ]
 
-    # Зв'язки згідно з малюнком
     blocks[0].connect_to(blocks[1.1])
     blocks[0].connect_to(blocks[3.1])
 
@@ -261,6 +259,8 @@ elif scheme == "Variant 4":
     blocks[5].connect_to(blocks[6])
 
 
+
+
 # MARK: generate_graph()
 def generate_graph(enable_repair=False):
     valid_node_num = 1
@@ -268,9 +268,6 @@ def generate_graph(enable_repair=False):
     block_types = {bid: blocks[bid].type for bid in block_ids}
     block_lams = {bid: blocks[bid].lam for bid in block_ids}
     block_mus = {bid: blocks[bid].mu for bid in block_ids}
-    # total_blocks = len(block_ids)
-
-    block_repair_types = {bid: blocks[bid].type for bid in block_ids}
 
     output_lines = []  # for streamlit
 
@@ -290,8 +287,6 @@ def generate_graph(enable_repair=False):
     idx += 1
 
     # All unique states to avoid duplicates
-    # seen = {}
-    # seen[tuple(sorted(start_states.items()))] = 1
     seen = {tuple(sorted(start_states.items())): 1}
 
     # Init lists
@@ -306,63 +301,55 @@ def generate_graph(enable_repair=False):
         parent_idx = current_node.idx
         next_row = row + 1
 
-
-
-        # --- 0. Перевірка: чи працює система в ПОТОЧНОМУ стані? ---
-        # Нам це треба знати, щоб вирішити, чи можна ламати далі.
+        # --- 0. Check: is the system operational in the CURRENT state? ---
+        # We need to know this to decide whether we can continue breaking further.
         current_broken_ids = [bid for bid, state in current_states.items() if state == 0 or state < 0]
         is_current_system_alive = can_reach(blocks, 0, max(blocks.keys()), current_broken_ids)
 
-        # ==========================================
-        # НОВА ЛОГІКА: ПЕРЕВІРКА НА "ВІЧНУ СМЕРТЬ"
-        # ==========================================
+        # CHECK FOR "PERMANENT DEATH"
         if not is_current_system_alive:
-            # 1. Знаходимо блоки, які вже НЕМОЖЛИВО полагодити (досягли ліміту версій)
+            # 1. Find blocks that are already IMPOSSIBLE to repair (have reached the version limit)
             irreparable_broken_ids = []
             for bid in current_broken_ids:
                 val = current_states[bid]
                 rtype = block_types.get(bid, 'S')
-                # Якщо S-тип і стан -2 (або менше), ремонт неможливий
+                # If S-type and state is -2 (or less), repair is impossible
                 if rtype == 'S' and abs(val) >= 2:
                     irreparable_broken_ids.append(bid)
             
-            # 2. Перевіряємо: якщо ми полагодимо ВСЕ, крім вічно зламаних, чи запрацює система?
-            # Тобто, чи є irreparable_broken_ids критичним набором?
+            # 2. Check: if we repair EVERYTHING except the permanently broken ones, will the system work?
+            # In other words, are irreparable_broken_ids a critical set?
             can_ever_recover = can_reach(blocks, 0, max(blocks.keys()), irreparable_broken_ids)
 
-            # 3. Якщо надії немає — зупиняємо цю гілку.
+            # 3. If there is no hope — stop this branch.
             if not can_ever_recover:
                 output_lines.append(f"Node {idx}: System is PERMANENTLY DEAD (Unrecoverable). Stopping branch.")
                 output_lines.append("-" * 30)
                 # Важливо: ми не додаємо нічого в queue і переходимо до наступної ноди в черзі
                 current_node.is_permanently_dead = True
                 continue 
-        # ==========================================
-        
 
-        # --- 1. Збираємо всі можливі переходи (Transitions) ---
-        transitions = [] # Список кортежів: (block_id, new_state_value, action_type)
+        # --- 1. Collect all possible transitions ---
+        transitions = [] # List of tuples: (block_id, new_state_value, action_type)
 
-        if is_current_system_alive:  # <--- ДОДАНО ЦЮ УМОВУ
+        if is_current_system_alive:
         # Failure transitions
-        # Перевірка: якщо блок у парі виключення вже зламаний, другий не можна ламати.
+        # Check: if a block in a mutual exclusion pair is already broken, the other cannot be broken.
             # working_blocks = [bid for bid, state in current_states.items() if state == 1]
-            # Шукаємо блоки, які зараз працюють (val > 0)
+            # Find blocks that are currently working (val > 0)
             working_blocks = [bid for bid, val in current_states.items() if val > 0]
 
-        # filtered_blocks = []
-
-            # До створення нового вузла.
-            # Якщо заблоковано кимось — не додаємо
+            # Before creating a new node.
+            # If blocked by someone — do not add
             for bid in working_blocks:
-                # Перевіряємо, чи є хоч одна умова, яка блокує цей bid
+                # Check if there is any condition that blocks this bid
                 is_blocked = any(
                     (bid == a and current_states.get(b, 1) <= 0) or 
                     (bid == b and current_states.get(a, 1) <= 0)
                     for a, b in mutual_exclusions
                 )
+                
                 if not is_blocked:
-                    # filtered_blocks.append(bid)
 
                     current_val = current_states[bid]
                     rtype = block_types.get(bid, 'S')
@@ -375,7 +362,7 @@ def generate_graph(enable_repair=False):
                     # transitions.append((bid, 0, "fail"))
                     transitions.append((bid, new_val, "fail"))
 
-        # Б. ЛОГІКА РЕМОНТУ (0 -> 1)  <-- НОВИЙ ФУНКЦІОНАЛ
+        # B. REPAIR LOGIC (0 -> 1)
         if enable_repair:
             broken_blocks = [bid for bid, state in current_states.items() if state == 0 or state < 0]
             for bid in broken_blocks:
@@ -384,30 +371,27 @@ def generate_graph(enable_repair=False):
                 new_val = None
 
                 if rtype == 'H':
-                    new_val = 1 # Завжди відновлюється в 1
+                    new_val = 1 # Always restores to 1
                 elif rtype == 'S':
-                    # Логіка S: відновлюється лише 1 раз (тобто перехід 1 -> 2)
-                    # Якщо current_val == -1 (зламалась 1-ша версія), то ремонтуємо в 2
-                    # Якщо current_val == -2 (зламалась 2-га версія), ремонту більше немає
+                    # S logic: can be restored only once (i.e., transition 1 -> 2)
+                    # If current_val == -1 (first version failed), repair to 2
+                    # If current_val == -2 (second version failed), no more repairs possible
                     version_broken = abs(current_val)
-                    if version_broken < 2: # Ліміт ремонтів (тут 1 ремонт, отже макс версія 2)
+                    if version_broken < 2: # Repair limit (here 1 repair, so max version is 2)
                         new_val = version_broken + 1
 
                 if new_val is not None:
-                    # transitions.append((bid, 1, "repair"))
                     transitions.append((bid, new_val, "repair"))
 
 
         # For each block that is not yet broken, create a new state with an additional failure
-        # for broken_bid in filtered_blocks:
         for target_bid, target_val, action_type in transitions:
             new_states = current_states.copy()
-            # new_states[broken_bid] = 0
             new_states[target_bid] = target_val
 
-            # Визначаємо "заблоковані" блоки — ті, які не можна ламати через взаємні виключення.
-            # Це потрібно для коректного відображення стану вузла.
-            # "вішає ярлик" на блоки, які залишилися цілими.
+            # Determine "locked" blocks — those that cannot be broken due to mutual exclusions.
+            # This is needed for correct node state display.
+            # "tags" blocks that remain intact.
             locked_blocks = []
             for a, b in mutual_exclusions:
                 if (new_states.get(a, 1) <= 0) and (new_states.get(b, 1) > 0):
@@ -415,32 +399,26 @@ def generate_graph(enable_repair=False):
                 if (new_states.get(b, 1) <= 0) and (new_states.get(a, 1) > 0):
                     locked_blocks.append(a)
 
-
             state_tuple = tuple(sorted(new_states.items()))
             duplicate_idx = seen.get(state_tuple)
             
             node = GraphNode(next_row, idx, valid_node_num, parent_idx, new_states, block_ids, block_types, block_lams, block_mus)
             node.locked_blocks = locked_blocks
 
-            # node.action_type = action_type # Можна зберегти тип дії для розмальовки стрілочок (червона/зелена)
-            # node.changed_block = target_bid # Який блок змінив стан
-
             for line in node.print_states_lines():
                 output_lines.append(line)
             output_lines.append(f"Action: {action_type.upper()} block {target_bid}")
 
-            # broken_ids = [bid for bid, state in new_states.items() if state == 0] 
+            # broken_ids - list of broken blocks in the new state
             broken_ids = [bid for bid, state in new_states.items() if state == 0 or state < 0]
-            # broken_ids - список зламаних блоків у новому стані
+            
             can_reach_result = can_reach(blocks, 0, max(blocks.keys()), broken_ids)
             if not can_reach_result:
                 node.is_dead = True
 
             output_lines.append(f"Endpoint check: {'✅' if can_reach_result else '❌'}")
 
-
             # --- LOGIC BRANCHING ---
-
             if duplicate_idx is not None:
                 # --- CASE 1: DUPLICATE ---
                 if parent_idx in node_by_idx and duplicate_idx in node_by_idx:
@@ -471,10 +449,8 @@ def generate_graph(enable_repair=False):
                 # if can_reach_result:
                 #     queue.append(node)
 
-                # Додаємо в чергу, навіть якщо стан "мертвий"?
-                # Зазвичай так, бо з мертвого стану можна "полагодитись" назад у живий.
-                # Але якщо ви хочете зупиняти симуляцію при відмові системи, то лишіть `if can_reach_result`.
-                # Для повного графа станів краще додавати завжди:
+                # Add to queue even if the state is "dead"?
+                # Usually yes, because you can "repair" from a dead state back to a working one.
                 queue.append(node)
 
             # --- FINALIZING ITERATION ---
@@ -483,33 +459,6 @@ def generate_graph(enable_repair=False):
             idx += 1
 
     return valid_nodes, all_nodes, output_lines
-
-
-valid_nodes, all_nodes, output_lines = generate_graph(enable_repair=enable_repair)
-
-
-
-# Робочі вузли
-working_nodes = [node for node in valid_nodes if not node.is_dead and not node.is_permanently_dead]
-# Поламані вузли (але не вічна смерть)
-failed_nodes = [node for node in valid_nodes if node.is_dead and not node.is_permanently_dead]
-# Вузли у "вічній смерті"
-perma_dead_nodes = [node for node in valid_nodes if node.is_permanently_dead]
-
-st.markdown(f"##### `Generated (All): {len(all_nodes)}` `Valid: {len(valid_nodes)}` `Working: {len(working_nodes)}` `Failed: {len(failed_nodes)}` `Permanent Fail: {len(perma_dead_nodes)}`")
-
-# Output via streamlit
-tab_gen_conn, tab_eq, tab_charts, tab_graph = st.tabs([
-    "Logs", 
-    "Equations", 
-    "Charts & Reliability", 
-    "Graph Visualization" 
-    ], 
-    default="Charts & Reliability"
-)
-
-
-
 
 
 # MARK: get_valid_nodes_connections_text
@@ -568,19 +517,6 @@ def get_valid_nodes_connections_text(nodes: List[GraphNode]):
                     
         lines.append("-" * 40)
     return "\n".join(lines)
-
-# For Streamlit:
-with tab_gen_conn:
-    col_gen, col_conn = st.columns(2)
-    with col_gen:
-        st.subheader("Generation Log")
-        st.code('\n'.join(output_lines), language="None")
-    with col_conn:
-        st.subheader("Connections")
-        st.code(get_valid_nodes_connections_text(valid_nodes), language="None")
-
-
-
 
 
 # MARK: build_kolmogorov_equations_latex
@@ -645,15 +581,6 @@ def build_kolmogorov_equations_latex(nodes: List[GraphNode]):
         eqs_latex.append(f"{dPdt} = {rhs}")
 
     return eqs_latex
-
-eqs_latex = build_kolmogorov_equations_latex(valid_nodes)
-
-with tab_eq:
-    for idx, eq_latex in enumerate(eqs_latex, 1):
-        st.latex(f"{idx}.\\quad {eq_latex}", width="content")
-
-
-
 
 
 # MARK: kolmogorov_rhs
@@ -736,6 +663,7 @@ def kolmogorov_rhs(t, P, nodes: List[GraphNode]):
 
     return dPdt
 
+
 # MARK: solve_kolmogorov
 def solve_kolmogorov(nodes, t_span, P0=None, t_eval=None, rtol=1e-9, atol=1e-12):
     n = len(nodes)
@@ -758,6 +686,51 @@ def solve_kolmogorov(nodes, t_span, P0=None, t_eval=None, rtol=1e-9, atol=1e-12)
 
 
 
+
+
+# MARK: Main Execution
+
+valid_nodes, all_nodes, output_lines = generate_graph(enable_repair=enable_repair)
+
+# Working nodes
+working_nodes = [node for node in valid_nodes if not node.is_dead and not node.is_permanently_dead]
+# Failed nodes (but not permanent death)
+failed_nodes = [node for node in valid_nodes if node.is_dead and not node.is_permanently_dead]
+# Nodes in "permanent death"
+perma_dead_nodes = [node for node in valid_nodes if node.is_permanently_dead]
+
+st.markdown(f"##### `Generated (All): {len(all_nodes)}` `Valid: {len(valid_nodes)}` `Working: {len(working_nodes)}` `Failed: {len(failed_nodes)}` `Permanent Fail: {len(perma_dead_nodes)}`")
+
+
+tab_gen_conn, tab_eq, tab_charts, tab_graph = st.tabs([
+    "Logs", 
+    "Equations", 
+    "Charts & Reliability", 
+    "Graph Visualization" 
+    ], 
+    default="Charts & Reliability"
+)
+
+
+with tab_gen_conn:
+    col_gen, col_conn = st.columns(2)
+    with col_gen:
+        st.subheader("Generation Log")
+        st.code('\n'.join(output_lines), language="None")
+    with col_conn:
+        st.subheader("Connections")
+        st.code(get_valid_nodes_connections_text(valid_nodes), language="None")
+
+
+
+eqs_latex = build_kolmogorov_equations_latex(valid_nodes)
+
+with tab_eq:
+    for idx, eq_latex in enumerate(eqs_latex, 1):
+        st.latex(f"{idx}.\\quad {eq_latex}", width="content")
+
+
+
 P0 = None
 ode_start_time = time.time()
 sol = solve_kolmogorov(
@@ -769,10 +742,6 @@ sol = solve_kolmogorov(
     atol=atol
 )
 time_stats['solve_kolmogorov'] = time.time() - ode_start_time
-
-
-
-
 
 
 
@@ -825,6 +794,9 @@ alive_probs_sum = np.round(alive_probs_sum, 6)  # Add rounding
 
 # K_g = alive_probs_sum[-1]  # Стаціонарний коефіцієнт готовності
 # st.write(f"Стаціонарний коефіцієнт готовності: {K_g:.6f}")
+# failed_mask = np.array([node.is_dead for node in valid_nodes])
+# K_p = np.sum(sol.y[failed_mask, -1])
+# st.write(f"Стаціонарний коефіцієнт відмови: {K_p:.6f}")
 
 fig_alive = go.Figure()
 fig_alive.add_trace(go.Scatter(
@@ -849,8 +821,6 @@ mttf = np.trapezoid(alive_probs_sum, sol.t)
 with tab_charts:
     with st.expander(f"Mean time to failure `{mttf:.6f}`", expanded=True):
         st.plotly_chart(fig_alive, use_container_width=True)
-
-
 
 
 
@@ -961,8 +931,6 @@ time_stats['state_probs_chart'] = time.time() - state_probs_chart_start_time
 
 
 
-
-
 # MARK: draw graph
 with tab_graph:
     if st.button("Generate and Draw Graph"):
@@ -1012,8 +980,6 @@ with tab_graph:
 
             img_all_2x = img_all.resize((img_all.width // 2, img_all.height // 2), Image.LANCZOS)
             img_all_2x.save("images/all_nodes_2x.png")
-
-
 
 
 
