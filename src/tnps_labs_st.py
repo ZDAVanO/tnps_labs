@@ -20,7 +20,7 @@ from typing import List
 
 # MARK: st config
 st.set_page_config(
-    page_title="Lab 1 TNPS",
+    page_title=" TNPS Labs",
     page_icon= "🧪",
     layout="wide" # wide, centered
 )
@@ -99,7 +99,7 @@ with st.sidebar:
 
         integration_time = st.slider(
             "Integration time (t, sec)", 
-            min_value=100, max_value=15000, value=2500, step=100
+            min_value=100, max_value=70000, value=2500, step=100
         )
 
         n_points = st.number_input(
@@ -773,7 +773,7 @@ fig.update_layout(
 # with st.container(border=True):
 with tab_charts:
     with st.expander("State probabilities chart", expanded=True):
-        st.plotly_chart(fig, use_container_width=True, 
+        st.plotly_chart(fig, width='stretch', 
                             config={
                                 # "scrollZoom": True, 
                                 "displayModeBar": True
@@ -792,7 +792,22 @@ alive_probs_sum = np.round(alive_probs_sum, 6)  # Add rounding
 # st.write(alive_probs_sum)
 # st.text(len(alive_probs_sum))
 
-# K_g = alive_probs_sum[-1]  # Стаціонарний коефіцієнт готовності
+
+# --- Зберігаємо попередній розрахунок у session_state ---
+if 'prev_alive_probs_sum' not in st.session_state or 'prev_sol_t' not in st.session_state:
+    st.session_state['prev_alive_probs_sum'] = None
+    st.session_state['prev_sol_t'] = None
+
+prev_alive_probs_sum = st.session_state['prev_alive_probs_sum']
+prev_sol_t = st.session_state['prev_sol_t']
+
+# --- Оновлюємо поточний розрахунок у session_state ---
+st.session_state['prev_alive_probs_sum'] = alive_probs_sum.copy()
+st.session_state['prev_sol_t'] = sol.t.copy()
+
+
+
+K_g = alive_probs_sum[-1]  # Стаціонарний коефіцієнт готовності
 # st.write(f"Стаціонарний коефіцієнт готовності: {K_g:.6f}")
 # failed_mask = np.array([node.is_dead for node in valid_nodes])
 # K_p = np.sum(sol.y[failed_mask, -1])
@@ -806,21 +821,33 @@ fig_alive.add_trace(go.Scatter(
     name='Sum of probabilities of working states',
     line=dict(width=3, color='#2ecc40')
 ))
+
+# --- Додаємо попередній графік, якщо він є ---
+if prev_alive_probs_sum is not None and prev_sol_t is not None:
+    fig_alive.add_trace(go.Scatter(
+        x=prev_sol_t,
+        y=prev_alive_probs_sum,
+        mode='lines',
+        name='Previous reliability',
+        line=dict(width=2, color="#ff0000", dash='dash')
+    ))
+
 fig_alive.update_layout(
     xaxis_title='t',
     yaxis_title='Sum of probabilities of working states',
     title='System reliability chart',
-    height=400,
+    height=415,
     margin=dict(l=0, r=0, t=30, b=0),
     dragmode=False,
+    legend=dict(font=dict(size=12), orientation="h"),
 )
 
 # Mean time to failure (MTTF)
 mttf = np.trapezoid(alive_probs_sum, sol.t)
 
 with tab_charts:
-    with st.expander(f"Mean time to failure `{mttf:.6f}`", expanded=True):
-        st.plotly_chart(fig_alive, use_container_width=True)
+    with st.expander(f"Mean time to failure `{mttf:.6f}` `K_g: {K_g:.6f}`", expanded=True):
+        st.plotly_chart(fig_alive, width='stretch')
 
 
 
@@ -922,12 +949,18 @@ with tab_charts:
             )
 
             st.plotly_chart(fig_bar, 
-                            use_container_width=True,
+                            width='stretch',
                             config={"scrollZoom": False, 
                                     "displayModeBar": True})
 
 
 time_stats['state_probs_chart'] = time.time() - state_probs_chart_start_time
+
+
+def get_timestamped_filename(base_name: str) -> str:
+    """Return filename in format YYYY-MM-DD-HH-MM-SS-base_name.png"""
+    ts = time.strftime("%Y-%m-%d-%H-%M-%S")
+    return f"images/{ts}-{base_name}.png"
 
 
 
@@ -951,7 +984,7 @@ with tab_graph:
                 with st.expander("Graph of Valid Nodes", expanded=True):
                     st.image(img_graph, caption="Graph of Valid Nodes", width="stretch")
                     
-            img_graph.save("images/graph.png")
+            img_graph.save(get_timestamped_filename("graph"))
 
             # Timing for drawing all nodes
             t0_all = time.time()
@@ -965,7 +998,7 @@ with tab_graph:
                 with st.expander("All Generated Nodes", expanded=True):
                     st.image(img_all, caption="All Generated Nodes", width="stretch")
 
-            img_all.save("images/all_nodes.png")
+            img_all.save(get_timestamped_filename("all_nodes"))
 
             t0_save_images = time.time()
             time_stats['save_images'] = time.time() - t0_save_images
@@ -976,10 +1009,10 @@ with tab_graph:
 
             # # Save at half size
             img_graph_2x = img_graph.resize((img_graph.width // 2, img_graph.height // 2), Image.LANCZOS)
-            img_graph_2x.save("images/graph_2x.png")
+            img_graph_2x.save(get_timestamped_filename("graph_2x"))
 
             img_all_2x = img_all.resize((img_all.width // 2, img_all.height // 2), Image.LANCZOS)
-            img_all_2x.save("images/all_nodes_2x.png")
+            img_all_2x.save(get_timestamped_filename("all_nodes_2x"))
 
 
 
