@@ -106,7 +106,7 @@ with st.sidebar:
 
         integration_time = st.slider(
             "Integration time (t, sec)", 
-            min_value=100, max_value=100000, value=2500, step=100
+            min_value=100, max_value=250000, value=2500, step=100
         )
 
         n_points = st.number_input(
@@ -116,15 +116,15 @@ with st.sidebar:
 
         pr_col1, pr_col2 = st.columns(2)
 
-        rtol = pr_col1.number_input(
-            "Integrator relative tolerance (rtol)", 
-            min_value=1e-12, max_value=1e-3, value=1e-9, format="%.1e", disabled=True
-        )
+        # rtol = pr_col1.number_input(
+        #     "Integrator relative tolerance (rtol)", 
+        #     min_value=1e-12, max_value=1e-3, value=1e-9, format="%.1e", disabled=True
+        # )
 
-        atol = pr_col2.number_input(
-            "Integrator absolute tolerance (atol)", 
-            min_value=1e-15, max_value=1e-6, value=1e-12, format="%.1e", disabled=True
-        )
+        # atol = pr_col2.number_input(
+        #     "Integrator absolute tolerance (atol)", 
+        #     min_value=1e-15, max_value=1e-6, value=1e-12, format="%.1e", disabled=True
+        # )
 
     with st.expander("Block values", expanded=True):
         input_col1, input_col2 = st.columns(2)
@@ -591,105 +591,105 @@ def build_kolmogorov_equations_latex(nodes: List[GraphNode]):
 
 
 # MARK: kolmogorov_rhs
-def kolmogorov_rhs(t, P, nodes: List[GraphNode]):
+# def kolmogorov_rhs(t, P, nodes: List[GraphNode]):
 
-    dPdt = np.zeros_like(P) # dPdt — array of probability derivatives for each state (node)
+#     dPdt = np.zeros_like(P) # dPdt — array of probability derivatives for each state (node)
 
-    for i, node in enumerate(nodes):
+#     for i, node in enumerate(nodes):
 
-        in_terms = []
-        out_terms = []
+#         in_terms = []
+#         out_terms = []
 
-        # Iterate all input nodes (from which you can reach current)
-        for inp_num in node.inputs:
-            # Find index of input node in nodes list
-            inp_idx = next((j for j, n in enumerate(nodes) if n.idx == inp_num), None)
-            if inp_idx is not None:
-                # Determine which blocks changed state when transitioning from inp_node to node
-                diff = [(bid, node.block_states[bid], nodes[inp_idx].block_states[bid]) 
-                        for bid in node.block_states 
-                        if node.block_states[bid] != nodes[inp_idx].block_states[bid]]
-                # print(diff)
+#         # Iterate all input nodes (from which you can reach current)
+#         for inp_num in node.inputs:
+#             # Find index of input node in nodes list
+#             inp_idx = next((j for j, n in enumerate(nodes) if n.idx == inp_num), None)
+#             if inp_idx is not None:
+#                 # Determine which blocks changed state when transitioning from inp_node to node
+#                 diff = [(bid, node.block_states[bid], nodes[inp_idx].block_states[bid]) 
+#                         for bid in node.block_states 
+#                         if node.block_states[bid] != nodes[inp_idx].block_states[bid]]
+#                 # print(diff)
                 
-                # For each such block add term to in_terms
-                for bid, st1, st2 in diff:
-                    lam = node.block_lams.get(bid, None)
-                    # if lam:
-                    if lam is not None:
-                        in_terms.append(lam * P[inp_idx])
-                    else:
-                        raise ValueError(f"Lambda not found for block {bid} in node {node.idx}")
+#                 # For each such block add term to in_terms
+#                 for bid, st1, st2 in diff:
+#                     lam = node.block_lams.get(bid, None)
+#                     # if lam:
+#                     if lam is not None:
+#                         in_terms.append(lam * P[inp_idx])
+#                     else:
+#                         raise ValueError(f"Lambda not found for block {bid} in node {node.idx}")
 
-        # Iterate all output nodes (where you can go from current)
-        for out_num in node.outputs:
-            # Find index of output node in nodes list
-            out_idx = next((j for j, n in enumerate(nodes) if n.idx == out_num), None)
-            if out_idx is not None:
-                # Determine which blocks changed state when transitioning from node to out_node
-                diff = [(bid, node.block_states[bid], nodes[out_idx].block_states[bid]) 
-                        for bid in node.block_states 
-                        if node.block_states[bid] != nodes[out_idx].block_states[bid]]
+#         # Iterate all output nodes (where you can go from current)
+#         for out_num in node.outputs:
+#             # Find index of output node in nodes list
+#             out_idx = next((j for j, n in enumerate(nodes) if n.idx == out_num), None)
+#             if out_idx is not None:
+#                 # Determine which blocks changed state when transitioning from node to out_node
+#                 diff = [(bid, node.block_states[bid], nodes[out_idx].block_states[bid]) 
+#                         for bid in node.block_states 
+#                         if node.block_states[bid] != nodes[out_idx].block_states[bid]]
                 
-                # For each such block add term to out_terms
-                for bid, st1, st2 in diff:
-                    lam = node.block_lams.get(bid, None)
-                    # if lam:
-                    if lam is not None:
-                        out_terms.append(lam * P[i])
-                    else:
-                        raise ValueError(f"Lambda not found for block {bid} in node {node.idx}")
+#                 # For each such block add term to out_terms
+#                 for bid, st1, st2 in diff:
+#                     lam = node.block_lams.get(bid, None)
+#                     # if lam:
+#                     if lam is not None:
+#                         out_terms.append(lam * P[i])
+#                     else:
+#                         raise ValueError(f"Lambda not found for block {bid} in node {node.idx}")
 
-        # Repair transitions
-        for inp_num in getattr(node, "repair_inputs", []):
-            inp_idx = next((j for j, n in enumerate(nodes) if n.idx == inp_num), None)
-            if inp_idx is not None:
-                diff = [(bid, node.block_states[bid], nodes[inp_idx].block_states[bid]) 
-                        for bid in node.block_states 
-                        if node.block_states[bid] != nodes[inp_idx].block_states[bid]]
-                for bid, st1, st2 in diff:
-                    mu = node.block_mus.get(bid, None)
-                    if mu is not None:
-                        in_terms.append(mu * P[inp_idx])
-                    else:
-                        raise ValueError(f"Lambda not found for block {bid} in node {node.idx}")
+#         # Repair transitions
+#         for inp_num in getattr(node, "repair_inputs", []):
+#             inp_idx = next((j for j, n in enumerate(nodes) if n.idx == inp_num), None)
+#             if inp_idx is not None:
+#                 diff = [(bid, node.block_states[bid], nodes[inp_idx].block_states[bid]) 
+#                         for bid in node.block_states 
+#                         if node.block_states[bid] != nodes[inp_idx].block_states[bid]]
+#                 for bid, st1, st2 in diff:
+#                     mu = node.block_mus.get(bid, None)
+#                     if mu is not None:
+#                         in_terms.append(mu * P[inp_idx])
+#                     else:
+#                         raise ValueError(f"Lambda not found for block {bid} in node {node.idx}")
 
-        for out_num in getattr(node, "repair_outputs", []):
-            out_idx = next((j for j, n in enumerate(nodes) if n.idx == out_num), None)
-            if out_idx is not None:
-                diff = [(bid, node.block_states[bid], nodes[out_idx].block_states[bid]) 
-                        for bid in node.block_states 
-                        if node.block_states[bid] != nodes[out_idx].block_states[bid]]
-                for bid, st1, st2 in diff:
-                    mu = node.block_mus.get(bid, None)
-                    if mu is not None:
-                        out_terms.append(mu * P[i])
-                    else:
-                        raise ValueError(f"Lambda not found for block {bid} in node {node.idx}")
+#         for out_num in getattr(node, "repair_outputs", []):
+#             out_idx = next((j for j, n in enumerate(nodes) if n.idx == out_num), None)
+#             if out_idx is not None:
+#                 diff = [(bid, node.block_states[bid], nodes[out_idx].block_states[bid]) 
+#                         for bid in node.block_states 
+#                         if node.block_states[bid] != nodes[out_idx].block_states[bid]]
+#                 for bid, st1, st2 in diff:
+#                     mu = node.block_mus.get(bid, None)
+#                     if mu is not None:
+#                         out_terms.append(mu * P[i])
+#                     else:
+#                         raise ValueError(f"Lambda not found for block {bid} in node {node.idx}")
 
-        dPdt[i] = sum(in_terms) - sum(out_terms)
+#         dPdt[i] = sum(in_terms) - sum(out_terms)
 
-    return dPdt
+#     return dPdt
 
 
-# MARK: solve_kolmogorov
-def solve_kolmogorov(nodes, t_span, P0=None, t_eval=None, rtol=1e-9, atol=1e-12):
-    n = len(nodes)
-    if P0 is None:
-        P0 = np.zeros(n)
-        P0[0] = 1.0  # Initial state: all probability in first node
-    if t_eval is None:
-        t_eval = np.linspace(t_span[0], t_span[1], n_points)
-    sol = solve_ivp(
-        fun=lambda t, P: kolmogorov_rhs(t, P, nodes),
-        t_span=t_span,
-        y0=P0,
-        t_eval=t_eval,
-        # method='RK45'
-        # rtol=1e-7, atol=1e-9
-        # rtol=rtol, # Relative error of integrator
-        # atol=atol # Absolute error of integrator
-    )
-    return sol
+# # MARK: solve_kolmogorov
+# def solve_kolmogorov(nodes, t_span, P0=None, t_eval=None, rtol=1e-9, atol=1e-12):
+#     n = len(nodes)
+#     if P0 is None:
+#         P0 = np.zeros(n)
+#         P0[0] = 1.0  # Initial state: all probability in first node
+#     if t_eval is None:
+#         t_eval = np.linspace(t_span[0], t_span[1], n_points)
+#     sol = solve_ivp(
+#         fun=lambda t, P: kolmogorov_rhs(t, P, nodes),
+#         t_span=t_span,
+#         y0=P0,
+#         t_eval=t_eval,
+#         # method='RK45'
+#         # rtol=1e-7, atol=1e-9
+#         # rtol=rtol, # Relative error of integrator
+#         # atol=atol # Absolute error of integrator
+#     )
+#     return sol
 
 # MARK: build_transition_matrix
 def build_transition_matrix(nodes):
@@ -853,8 +853,8 @@ sol = solve_kolmogorov_fast(
     t_span=(0, integration_time), 
     P0=P0, 
     t_eval=np.linspace(0, integration_time, n_points),
-    rtol=rtol,
-    atol=atol
+    # rtol=rtol,
+    # atol=atol
 )
 time_stats['solve_kolmogorov'] = time.time() - ode_start_time
 
@@ -932,7 +932,7 @@ fig_alive.add_trace(go.Scatter(
     x=sol.t,
     y=alive_probs_sum,
     mode='lines',
-    name='Sum of probabilities of working states',
+    name='Current',
     line=dict(width=3, color='#2ecc40')
 ))
 
@@ -942,7 +942,7 @@ if prev_alive_probs_sum is not None and prev_sol_t is not None:
         x=prev_sol_t,
         y=prev_alive_probs_sum,
         mode='lines',
-        name='Previous reliability',
+        name='Previous',
         line=dict(width=2, color="#ff0000", dash='dash')
     ))
 
