@@ -17,6 +17,8 @@ from models import LogicBlock, can_reach, GraphNode
 
 from typing import List
 
+from scipy.sparse import csr_matrix
+
 
 # MARK: st config
 st.set_page_config(
@@ -82,7 +84,7 @@ with st.sidebar:
 
     s_m_col1, s_m_col2 = st.columns(2)
 
-    scheme = s_m_col1.radio(
+    scheme = s_m_col2.radio(
         "Select block scheme:",
         options=["Simple Example", 
                  "Variant 5",
@@ -91,15 +93,20 @@ with st.sidebar:
         index=0
     )
 
-    enable_repair = s_m_col2.toggle("Enable repair", value=False)
+    reload_button = s_m_col1.button("Reload", 
+                                    help="Reload the app",
+                                    width="stretch",
+                                    # type="primary"
+                                    )
+    enable_repair = s_m_col1.toggle("Enable repair", value=False)
 
 
-    with st.container(border=True):
+    with st.expander("Integration settings", expanded=True):
         # st.subheader("Integration Settings")
 
         integration_time = st.slider(
             "Integration time (t, sec)", 
-            min_value=100, max_value=70000, value=2500, step=100
+            min_value=100, max_value=100000, value=2500, step=100
         )
 
         n_points = st.number_input(
@@ -684,13 +691,118 @@ def solve_kolmogorov(nodes, t_span, P0=None, t_eval=None, rtol=1e-9, atol=1e-12)
     )
     return sol
 
+# MARK: build_transition_matrix
+def build_transition_matrix(nodes):
+    n = len(nodes)
+    # Мапа для швидкого пошуку індексу вузла у списку за його idx
+    idx_map = {node.idx: i for i, node in enumerate(nodes)}
+    
+    rows = []
+    cols = []
+    data = []
 
+    # Проходимо по кожному вузлу (джерело переходу)
+    for i, node in enumerate(nodes):
+        
+        # 1. Переходи відмов (outputs)
+        # node -> out_node (із інтенсивністю lam)
+        # Це означає: P_out' += lam * P_node,  P_node' -= lam * P_node
+        
+        for out_id in node.outputs:
+            if out_id not in idx_map: continue
+            j = idx_map[out_id]
+            out_node = nodes[j]
+            
+            # Знаходимо rate (lambda)
+            # Логіка з вашого коду для пошуку, який блок змінився
+            diff = [bid for bid in node.block_states 
+                    if node.block_states[bid] != out_node.block_states[bid]]
+            
+            rate = 0.0
+            for bid in diff:
+                rate = node.block_lams.get(bid, 0.0)
+                # Беремо лише перший знайдений (або сумуємо, якщо логіка дозволяє кілька одночасних)
+                # У вашому випадку це завжди один перехід
+                break 
+            
+            if rate > 0:
+                # Прихід у стан j від i
+                rows.append(j)
+                cols.append(i)
+                data.append(rate)
+                
+                # Вихід зі стану i
+                rows.append(i)
+                cols.append(i)
+                data.append(-rate)
+
+        # 2. Переходи відновлення (repair_outputs)
+        # node -> repair_node (із інтенсивністю mu)
+        
+        r_outs = getattr(node, "repair_outputs", [])
+        for out_id in r_outs:
+            if out_id not in idx_map: continue
+            j = idx_map[out_id]
+            out_node = nodes[j]
+            
+            diff = [bid for bid in node.block_states 
+                    if node.block_states[bid] != out_node.block_states[bid]]
+            
+            rate = 0.0
+            for bid in diff:
+                rate = node.block_mus.get(bid, 0.0)
+                break
+            
+            if rate > 0:
+                rows.append(j)
+                cols.append(i)
+                data.append(rate)
+                
+                rows.append(i)
+                cols.append(i)
+                data.append(-rate)
+
+    # Створюємо стиснуту рядкову матрицю (CSR) для швидкого множення
+    A = csr_matrix((data, (rows, cols)), shape=(n, n))
+    return A
+
+
+# MARK: solve_kolmogorov_fast
+def solve_kolmogorov_fast(nodes, t_span, P0=None, t_eval=None, rtol=1e-9, atol=1e-12):
+    n = len(nodes)
+    if P0 is None:
+        P0 = np.zeros(n)
+        P0[0] = 1.0
+    
+    # 1. Будуємо матрицю ОДИН РАЗ
+    A_matrix = build_transition_matrix(nodes)
+
+    # 2. Визначаємо швидку функцію похідної
+    # dP/dt = A * P
+    def fast_rhs(t, P):
+        return A_matrix.dot(P)
+
+    if t_eval is None:
+        # Ваш дефолт
+        t_eval = np.linspace(t_span[0], t_span[1], 1500) 
+
+    sol = solve_ivp(
+        fun=fast_rhs,
+        t_span=t_span,
+        y0=P0,
+        t_eval=t_eval,
+        method='RK45', # або 'Radau', якщо система дуже жорстка (stiff)
+        # rtol=rtol,
+        # atol=atol
+    )
+    return sol
 
 
 
 # MARK: Main Execution
-
+gg_start_time = time.time()
 valid_nodes, all_nodes, output_lines = generate_graph(enable_repair=enable_repair)
+time_stats['generate_graph'] = time.time() - gg_start_time
 
 # Working nodes
 working_nodes = [node for node in valid_nodes if not node.is_dead and not node.is_permanently_dead]
@@ -719,11 +831,14 @@ with tab_gen_conn:
         st.code('\n'.join(output_lines), language="None")
     with col_conn:
         st.subheader("Connections")
+        gvnct_start_time = time.time()
         st.code(get_valid_nodes_connections_text(valid_nodes), language="None")
+        time_stats['get_valid_nodes_connections_text'] = time.time() - gvnct_start_time
 
 
-
+bkel_start_time = time.time()
 eqs_latex = build_kolmogorov_equations_latex(valid_nodes)
+time_stats['build_kolmogorov_equations_latex'] = time.time() - bkel_start_time
 
 with tab_eq:
     for idx, eq_latex in enumerate(eqs_latex, 1):
@@ -733,7 +848,7 @@ with tab_eq:
 
 P0 = None
 ode_start_time = time.time()
-sol = solve_kolmogorov(
+sol = solve_kolmogorov_fast(
     valid_nodes, 
     t_span=(0, integration_time), 
     P0=P0, 
@@ -746,7 +861,6 @@ time_stats['solve_kolmogorov'] = time.time() - ode_start_time
 
 
 # MARK: State probabilities chart
-state_probs_chart_start_time = time.time()
 STATE_LABELS = [str(node.idx) for node in valid_nodes]
 
 fig = go.Figure()
@@ -953,8 +1067,6 @@ with tab_charts:
                             config={"scrollZoom": False, 
                                     "displayModeBar": True})
 
-
-time_stats['state_probs_chart'] = time.time() - state_probs_chart_start_time
 
 
 def get_timestamped_filename(base_name: str) -> str:
