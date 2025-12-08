@@ -13,16 +13,34 @@ This program is designed for modeling and analyzing the reliability of complex s
 
 ## Installation and Launch
 
-1. **Install required libraries**  
+1. **Create and activate a virtual environment**  
+   It is recommended to use a virtual environment to manage dependencies.  
+   Create a new virtual environment:
+   ```
+   python -m venv venv
+   ```
+   Activate the virtual environment:
+
+   - On **Windows**:
+     ```
+     venv\Scripts\activate
+     ```
+   - On **Linux/macOS**:
+     ```
+     source venv/bin/activate
+     ```
+
+2. **Install required libraries**  
    Run the following command in your terminal to install all dependencies:
    ```
    pip install -r requirements.txt
    ```
 
-2. **Launch the application**  
-   You can run any Streamlit file directly:
+3. **Launch the application**  
+   The main entry point is `tnps_labs_st.py`.  
+   Run the following command:
    ```
-   streamlit run <your_file.py>
+   streamlit run tnps_labs_st.py
    ```
 
 ## Screenshots
