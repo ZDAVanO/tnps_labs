@@ -40,7 +40,7 @@ This program is designed for modeling and analyzing the reliability of complex s
    The main entry point is `tnps_labs_st.py`.  
    Run the following command:
    ```
-   streamlit run tnps_labs_st.py
+   streamlit run src/tnps_labs_st.py
    ```
 
 ## Screenshots
